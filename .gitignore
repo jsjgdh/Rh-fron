@@ -1,0 +1,8 @@
+/target
+*lock
+/dist
+/public/wasm
+.env
+.DS_Store
+*.wasm
+!Dioxus.toml

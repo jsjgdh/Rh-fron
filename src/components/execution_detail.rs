@@ -1,0 +1,136 @@
+use dioxus::prelude::*;
+use serde_json::Value;
+use crate::api::{get_execution_detail, get_workflow_detail};
+use crate::components::workflow_graph::WorkflowGraph;
+
+#[derive(Props, PartialEq, Clone)]
+pub struct ExecutionDetailProps {
+    pub execution_id: String,
+}
+
+#[component]
+pub fn ExecutionDetail(props: ExecutionDetailProps) -> Element {
+    let execution_id = props.execution_id.clone();
+    
+    let execution = use_resource({
+        let id = execution_id.clone();
+        move || {
+            let id = id.clone();
+            async move { get_execution_detail(&id).await }
+        }
+    });
+
+    let workflow = use_resource(move || {
+        let exec_data = execution.read().as_ref().and_then(|r| r.as_ref().ok().cloned());
+        async move {
+            if let Some(data) = exec_data {
+                let name = data["workflow_name"].as_str().unwrap_or_default();
+                let version = data["version"].as_str().unwrap_or_default();
+                get_workflow_detail(name, version).await
+            } else {
+                Err("Loading execution...".to_string())
+            }
+        }
+    });
+
+    let exec_state = execution.read();
+    let wf_state = workflow.read();
+
+    if let Some(Ok(data)) = &*exec_state {
+        let trace = data["trace"].as_object();
+        let steps = trace.and_then(|t| t.get("steps")).and_then(|s| s.as_array());
+        let active_steps: Vec<String> = steps
+            .map(|s| {
+                s.iter()
+                    .filter_map(|step| step["step_name"].as_str().map(String::from))
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        let status = data["status"].as_str().unwrap_or_default();
+        let status_lower = status.to_lowercase();
+        let created_at = data["created_at"].as_str().unwrap_or_default();
+        let wf_name = data["workflow_name"].as_str().unwrap_or("Unknown");
+
+        rsx! {
+            div { class: "dashboard-stack",
+                // ── Header Summary ───────────────────────────────────────
+                div { class: "card", style: "border-color: var(--accent-soft);",
+                    div { class: "card-header",
+                        div {
+                            div { class: "app-eyebrow", "Forensic Audit Trail" }
+                            h2 { class: "section-title", "Trace {execution_id}" }
+                            p { class: "section-copy", "Verified execution of {wf_name} recorded on {created_at}." }
+                        }
+                        span { class: "badge badge-{status_lower}", "{status}" }
+                    }
+                }
+
+                div { class: "grid-2",
+                    style: "grid-template-columns: 1fr 340px;",
+                    
+                    // ── Visual Verification ────────────────────────────────
+                    section { class: "card",
+                        div { class: "card-header",
+                            div {
+                                div { class: "card-title", "Visual Path Verification" }
+                                div { class: "card-description", "Highlighted spine showing the exact route taken during execution." }
+                            }
+                        }
+                        div { class: "vg-canvas",
+                            if let Some(Ok(wf_data)) = &*wf_state {
+                                {
+                                    let ast = wf_data.get("ast_json")
+                                        .and_then(|s| s.as_str())
+                                        .and_then(|s| serde_json::from_str::<Value>(s).ok())
+                                        .unwrap_or(Value::Null);
+                                    rsx! {
+                                        WorkflowGraph { 
+                                            injected_ast: ast,
+                                            active_steps: Some(active_steps.clone())
+                                        }
+                                    }
+                                }
+                            } else {
+                                div { class: "empty-state", "Loading graph verification..." }
+                            }
+                        }
+                    }
+
+                    // ── Audit Log ──────────────────────────────────────────
+                    aside { class: "card",
+                        style: "background-color: #08080A;",
+                        div { class: "card-header",
+                            div {
+                                div { class: "card-title", "Step-by-Step Audit" }
+                                div { class: "card-description", "Deterministic decision log." }
+                            }
+                        }
+                        div { class: "pipeline-list",
+                            if let Some(step_list) = steps {
+                                for (i, step) in step_list.iter().enumerate() {
+                                    {
+                                        let idx = i + 1;
+                                        let step_name = step["step_name"].as_str().unwrap_or("?");
+                                        let duration = step["timestamp_us"].as_u64().unwrap_or(0);
+                                        rsx! {
+                                            div { class: "pipeline-step",
+                                                div { class: "pipeline-index", "{idx}" }
+                                                div {
+                                                    div { class: "pipeline-title", "{step_name}" }
+                                                    div { class: "stat-note", "Latency: {duration}µs" }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    } else {
+        rsx! { div { class: "status-message", "Retrieving audit data from ledger..." } }
+    }
+}

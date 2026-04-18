@@ -1,0 +1,13 @@
+[application]
+name = "rhexiom"
+default_platform = "web"
+
+[web.app]
+title = "Rhexiom — Policy Execution Platform"
+
+[web.watcher]
+
+watch_path = ["src", "assets"]
+
+# Using asset! macro in app.rs for styles
+
