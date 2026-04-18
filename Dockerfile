@@ -9,7 +9,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Dioxus CLI
-RUN cargo install dioxus-cli --version 0.6.0-alpha.5
+RUN cargo install dioxus-cli --version 0.6.3 --locked
 
 # Setup WASM target
 RUN rustup target add wasm32-unknown-unknown
