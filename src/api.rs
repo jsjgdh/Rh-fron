@@ -82,6 +82,7 @@ pub struct RunRequest {
     pub workflow_name: String,
     pub version: String,
     pub input: HashMap<String, serde_json::Value>,
+    pub execution_mode: String,
 }
 
 /// A step generated locally for trace tracking

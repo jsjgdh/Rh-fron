@@ -235,6 +235,7 @@ pub fn ExecutionForm() -> Element {
                                         workflow_name: workflow,
                                         version,
                                         input: execution_input,
+                                        execution_mode: "Live".to_string(),
                                     };
 
                                     match crate::api::run_workflow(&request).await {
