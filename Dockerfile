@@ -28,7 +28,7 @@ RUN dx build --release
 FROM nginx:alpine
 
 # Copy the built assets to nginx
-COPY --from=builder /app/target/dx/rhexiom/release/web/public /usr/share/nginx/html
+COPY --from=builder /app/target/dx/rhexiom-frontend/release/web/public /usr/share/nginx/html
 
 # Custom Nginx config to handle SPA routing (redirect all to index.html)
 RUN echo 'server { \
