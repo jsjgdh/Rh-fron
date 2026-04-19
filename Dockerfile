@@ -18,7 +18,7 @@ WORKDIR /app
 COPY . .
 
 # Argument for the backend URL injected at build time
-ARG BACKEND_URL
+ARG BACKEND_URL="https://rh-back-production-c7cf.up.railway.app/api"
 ENV BACKEND_URL=$BACKEND_URL
 
 # Build the frontend for web
