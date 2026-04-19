@@ -30,16 +30,15 @@ FROM nginx:alpine
 # Copy the built assets to nginx
 COPY --from=builder /app/target/dx/rhexiom-frontend/release/web/public /usr/share/nginx/html
 
-# Custom Nginx config to handle SPA routing (redirect all to index.html)
+# Custom Nginx config template to handle SPA routing (dynamic port will be injected at runtime)
 RUN echo 'server { \
-    listen 80; \
+    listen ${PORT}; \
     location / { \
         root /usr/share/nginx/html; \
         index index.html; \
         try_files $uri $uri/ /index.html; \
     } \
-}' > /etc/nginx/conf.d/default.conf
+}' > /etc/nginx/conf.d/default.conf.template
 
-EXPOSE 80
-
-CMD ["nginx", "-g", "daemon off;"]
+# Use sh to substitute the port at runtime before starting nginx
+CMD ["/bin/sh", "-c", "envsubst '${PORT}' < /etc/nginx/conf.d/default.conf.template > /etc/nginx/conf.d/default.conf && nginx -g 'daemon off;'"]
