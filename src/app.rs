@@ -149,7 +149,7 @@ pub fn App() -> Element {
                     }
 
                     div { class: "sidebar-nav",
-                        div { class: "sidebar-section-label", "Operations" }
+                        div { class: "sidebar-section-label", "Intelligence" }
 
                         div {
                             class: if matches!(current, View::Dashboard) { "nav-item active" } else { "nav-item" },
@@ -158,12 +158,7 @@ pub fn App() -> Element {
                             span { "Control Tower" }
                         }
 
-                        div {
-                            class: if matches!(current, View::History) { "nav-item active" } else { "nav-item" },
-                            onclick: move |_| current_view.set(View::History),
-                            span { class: "nav-icon", "AL" }
-                            span { "Audit Logs" }
-                        }
+                        div { class: "sidebar-section-label", "Production" }
 
                         div {
                             class: if matches!(
@@ -176,16 +171,30 @@ pub fn App() -> Element {
                             },
                             onclick: move |_| current_view.set(View::Upload),
                             span { class: "nav-icon", "WF" }
-                            span { "Workflows" }
+                            span { "Policy Studio" }
                         }
-
-                        div { class: "sidebar-section-label", "Runtime" }
 
                         div {
                             class: if matches!(current, View::Execute) { "nav-item active" } else { "nav-item" },
                             onclick: move |_| current_view.set(View::Execute),
                             span { class: "nav-icon", "EX" }
-                            span { "Execute" }
+                            span { "Execution Sandbox" }
+                        }
+
+                        div {
+                            class: if matches!(current, View::Integrations) { "nav-item active" } else { "nav-item" },
+                            onclick: move |_| current_view.set(View::Integrations),
+                            span { class: "nav-icon", "SG" }
+                            span { "Service Registry" }
+                        }
+
+                        div { class: "sidebar-section-label", "Governance" }
+
+                        div {
+                            class: if matches!(current, View::History | View::ExecutionDetail { .. }) { "nav-item active" } else { "nav-item" },
+                            onclick: move |_| current_view.set(View::History),
+                            span { class: "nav-icon", "AL" }
+                            span { "Audit Logs" }
                         }
 
                         div {
@@ -199,14 +208,7 @@ pub fn App() -> Element {
                             class: if matches!(current, View::Documentation) { "nav-item active" } else { "nav-item" },
                             onclick: move |_| current_view.set(View::Documentation),
                             span { class: "nav-icon", "DX" }
-                            span { "Docs" }
-                        }
-
-                        div {
-                            class: if matches!(current, View::Integrations) { "nav-item active" } else { "nav-item" },
-                            onclick: move |_| current_view.set(View::Integrations),
-                            span { class: "nav-icon", "SG" }
-                            span { "Integrations" }
+                            span { "Documentation" }
                         }
                     }
 
@@ -214,22 +216,19 @@ pub fn App() -> Element {
                         if let Some(email) = user_email.read().as_ref() {
                             div { class: "profile-info",
                                 div {
-                                    style: "display: flex; justify-content: space-between; align-items: center; gap: 12px;",
-                                    div {
-                                        div { class: "profile-email", "{email}" }
-                                        div { class: "profile-role", "Admin Level 0" }
-                                    }
-                                    button {
-                                        class: "btn-secondary",
-                                        style: "padding: 4px 8px; font-size: 10px; height: auto; min-height: 0;",
-                                        onclick: move |_| {
-                                            crate::api::logout();
-                                            token.set(None);
-                                            user_email.set(None);
-                                            current_view.set(View::Home);
-                                        },
-                                        "Sign out"
-                                    }
+                                    div { class: "profile-role", "System Administrator" }
+                                    div { class: "profile-email", "{email}" }
+                                }
+                                button {
+                                    class: "btn",
+                                    style: "width: 100%; height: 36px; font-size: 11px; background: rgba(255,255,255,0.05); color: var(--sidebar-text); border-color: rgba(255,255,255,0.1);",
+                                    onclick: move |_| {
+                                        crate::api::logout();
+                                        token.set(None);
+                                        user_email.set(None);
+                                        current_view.set(View::Home);
+                                    },
+                                    "Sign out of Rhexiom"
                                 }
                             }
                         }
@@ -339,92 +338,65 @@ fn DashboardView(mut current_view: Signal<View>) -> Element {
 
     rsx! {
         div { class: "dashboard-stack control-dashboard",
-            section { class: "control-hero-card",
-                div { class: "control-hero-header",
-                    h2 { class: "control-section-title", "Deterministic Performance" }
-                    span { class: "control-chip", "Compliant" }
+            section { class: "grid-metrics",
+                div { class: "industrial-card glass",
+                    div { class: "label-caps", "System Telemetry" }
+                    div { class: "stat-value", "{system_status}" }
+                    div { class: "kpi-meta", "Forensic trace online" }
                 }
-                div { class: "control-kpi-grid",
-                    div { class: "control-kpi",
-                        div { class: "stat-label", "Active Policies" }
-                        div { class: "stat-value", "{active_workflows}" }
-                        div { class: "kpi-meta", "Zero drift detected" }
-                    }
 
-                    div { class: "control-kpi",
-                        div { class: "stat-label", "Total Throughput" }
-                        div { class: "stat-value", "{total_executions}" }
-                        div { class: "kpi-meta", "+12% vs prior window" }
-                    }
+                div { class: "industrial-card glass",
+                    div { class: "label-caps", "Active Policies" }
+                    div { class: "stat-value", "{active_workflows}" }
+                    div { class: "kpi-meta", "Zero drift detected" }
+                }
 
-                    div { class: "control-kpi",
-                        div { class: "stat-label", "System Heartbeat" }
-                        div { class: "stat-value", "{system_status}" }
-                        div { class: "kpi-meta", "Forensic trace online" }
-                    }
+                div { class: "industrial-card glass",
+                    div { class: "label-caps", "Total Throughput" }
+                    div { class: "stat-value", "{total_executions}" }
+                    div { class: "kpi-meta", "Verified on-chain" }
                 }
             }
 
             section { class: "control-two-column",
-                article { class: "card control-panel",
-                    div { class: "card-header",
-                        div {
-                            div { class: "card-title", "Human-In-The-Loop" }
-                            div { class: "card-description", "Pending execution approvals waiting for architecture sign-off." }
-                        }
+                style: "display: grid; grid-template-columns: 1fr 1fr; gap: var(--gap-main);",
+                article { class: "industrial-card",
+                    div { class: "label-caps", "Approval Queue" }
+                    h3 { style: "margin: 8px 0 12px; font-size: 20px;", "Pending Authorization" }
+                    p { class: "panel-copy", style: "margin-bottom: 24px; color: var(--text-secondary);",
+                        "Policy transitions held for architect sign-off. Review the immutable audit trail before continuing."
                     }
-                    p { class: "panel-copy",
-                        "Critical policy transitions can be paused for manual review before final ledger commit."
-                    }
-                    div { class: "hero-actions",
-                        button {
-                            class: "btn btn-primary",
-                            onclick: move |_| current_view.set(View::History),
-                            "Review executions"
-                        }
-                        button {
-                            class: "btn btn-secondary",
-                            onclick: move |_| current_view.set(View::Execute),
-                            "Run sandbox"
-                        }
+                    button {
+                        class: "btn btn-primary",
+                        onclick: move |_| current_view.set(View::History),
+                        "Review Audit Trail"
                     }
                 }
 
-                article { class: "card control-panel",
-                    div { class: "card-header",
-                        div {
-                            div { class: "card-title", "Quick Actions" }
-                            div { class: "card-description", "Jump into authoring, versions, and integration controls." }
-                        }
+                article { class: "industrial-card",
+                    div { class: "label-caps", "Studio Intelligence" }
+                    h3 { style: "margin: 8px 0 12px; font-size: 20px;", "Authoring Queue" }
+                    p { class: "panel-copy", style: "margin-bottom: 24px; color: var(--text-secondary);",
+                        "Jump straight into your workspace to draft logic or audit the version ledger."
                     }
-                    div { class: "control-action-grid",
+                    div { class: "control-action-grid", style: "display: flex; gap: 12px;",
                         button {
                             class: "btn btn-secondary",
                             onclick: move |_| current_view.set(View::Upload),
-                            "Create workflow"
+                            "Open Studio"
                         }
                         button {
                             class: "btn btn-secondary",
                             onclick: move |_| current_view.set(View::Versions),
-                            "Open ledger"
-                        }
-                        button {
-                            class: "btn btn-secondary",
-                            onclick: move |_| current_view.set(View::Integrations),
-                            "Manage integrations"
+                            "View Ledger"
                         }
                     }
                 }
             }
 
-            section { class: "card control-panel",
-                div { class: "card-header",
-                    div {
-                        div { class: "card-title", "Real-Time Execution Logs" }
-                        div { class: "card-description", "Latest executions and audit events." }
-                    }
-                }
-                div { class: "type-table",
+            section { class: "industrial-card",
+                div { class: "label-caps", "Forensic Execution Stream" }
+                div { class: "type-table", style: "margin-top: 24px;",
                     div { class: "type-row type-row-head",
                         div { "Workflow" }
                         div { "Status" }

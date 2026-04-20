@@ -1,5 +1,5 @@
 [application]
-name = "rhexiom"
+name = "rhexiom-frontend"
 default_platform = "web"
 
 [web.app]

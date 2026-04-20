@@ -3,10 +3,10 @@ use crate::components::workflow_graph::WorkflowGraph;
 
 #[derive(PartialEq, Props, Clone)]
 pub struct ViewGenWorkflowProps {
-    workflow_name: String,
-    version: String,
+    pub workflow_name: String,
+    pub version: String,
     #[props(default)]
-    on_edit_requested: EventHandler<()>,
+    pub on_edit_requested: EventHandler<()>,
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -37,33 +37,25 @@ pub fn ViewGenWorkflow(props: ViewGenWorkflowProps) -> Element {
     });
 
     rsx! {
-        div { class: "dashboard-stack",
-            // ── Header Summary ───────────────────────────────────────
+        div { class: "dashboard-studio",
+            
+            // ── Studio Navigation & Actions ──────────────────────────
             div { class: "tabs-header",
-                div { 
-                    class: if *current_tab.read() == DetailTab::Overview { "tab-item active" } else { "tab-item" },
-                    onclick: move |_| current_tab.set(DetailTab::Overview),
-                    "Overview" 
-                }
-                div { 
-                    class: if *current_tab.read() == DetailTab::Logic { "tab-item active" } else { "tab-item" },
-                    onclick: move |_| current_tab.set(DetailTab::Logic),
-                    "Logic" 
-                }
-                div { 
-                    class: if *current_tab.read() == DetailTab::Visual { "tab-item active" } else { "tab-item" },
-                    onclick: move |_| current_tab.set(DetailTab::Visual),
-                    "Visual Flow" 
-                }
-                div { 
-                    class: if *current_tab.read() == DetailTab::Audit { "tab-item active" } else { "tab-item" },
-                    onclick: move |_| current_tab.set(DetailTab::Audit),
-                    "Execution Audit" 
+                style: "margin-bottom: 32px; border-bottom: 1px solid var(--border-subtle);",
+                
+                div { class: "label-caps", style: "margin-right: 24px; color: var(--brand-emerald);", "STUDIO V2" }
+                
+                for (tab, label) in [(DetailTab::Overview, "Overview"), (DetailTab::Logic, "Logic"), (DetailTab::Visual, "Visual Flow"), (DetailTab::Audit, "Execution Audit")] {
+                    div { 
+                        class: if *current_tab.read() == tab { "tab-item active" } else { "tab-item" },
+                        onclick: move |_| current_tab.set(tab),
+                        "{label}" 
+                    }
                 }
 
                 button {
-                    class: "btn btn-secondary btn-sm",
-                    style: "margin-left: auto;",
+                    class: "btn btn-primary btn-sm",
+                    style: "margin-left: auto; height: 32px;",
                     onclick: move |_| on_edit_requested.call(()),
                     "Open in Builder"
                 }
@@ -71,92 +63,84 @@ pub fn ViewGenWorkflow(props: ViewGenWorkflowProps) -> Element {
 
             match *current_tab.read() {
                 DetailTab::Overview => rsx! {
-                    div { class: "dashboard-stack",
-                        div { class: "grid-3",
-                            div { class: "stat-card",
-                                div { class: "stat-label", "Workflow ID" }
-                                div { class: "stat-value stat-value-small", "{workflow_name}" }
+                    div { class: "dashboard-studio",
+                        style: "padding: 0;",
+                        
+                        // 1. High-Level Telemetry
+                        div { class: "studio-card-row",
+                            div { class: "studio-glass-card",
+                                div { class: "studio-label", "Policy Identifier" }
+                                div { class: "studio-value", style: "font-family: var(--font-mono); font-size: 18px;", "{workflow_name}" }
                             }
-                            div { class: "stat-card",
-                                div { class: "stat-label", "Release Version" }
-                                div { class: "stat-value", "{version}" }
+                            div { class: "studio-glass-card",
+                                div { class: "studio-label", "Release Target" }
+                                div { class: "studio-value", "v{version}" }
                             }
-                            div { class: "stat-card",
-                                div { class: "stat-label", "Compiled Status" }
-                                div { class: "stat-value stat-value-small", span { class: "badge badge-success", "Verified" } }
+                            div { class: "studio-glass-card",
+                                div { class: "studio-label", "Integrity Status" }
+                                div { class: "studio-value", 
+                                    span { class: "badge badge-success", style: "padding: 8px 16px; border-radius: 4px;", "Verified" } 
+                                }
                             }
                         }
 
+                        // 2. Technical Posture
                         div { class: "grid-2",
-                            section { class: "card",
-                                div { class: "card-header",
-                                    div {
-                                        div { class: "card-title", "Release Metadata" }
-                                        div { class: "card-description", "Technical overview of the compiled artifact." }
-                                    }
-                                }
+                            section { class: "studio-glass-card",
+                                div { class: "studio-label", "Synthesis Metadata" }
                                 if let Some(Some(detail)) = detail_res.read().as_ref() {
                                     div { class: "pipeline-list",
+                                        style: "margin-top: 16px;",
                                         div { class: "pipeline-step",
                                             div { class: "pipeline-index", "01" }
                                             div {
-                                                div { class: "pipeline-title", "Input Surface" }
-                                                p { class: "pipeline-copy", "Accepts {detail.get(\"inputs\").and_then(|i| i.as_array()).map(|a| a.len()).unwrap_or(0)} parameters." }
+                                                div { class: "pipeline-title", "Surface Parameters" }
+                                                p { style: "color: var(--text-secondary); font-size: 13px;", 
+                                                    "Accepts {detail.get(\"inputs\").and_then(|i| i.as_array()).map(|a| a.len()).unwrap_or(0)} unique input signals." 
+                                                }
                                             }
                                         }
                                         div { class: "pipeline-step",
                                             div { class: "pipeline-index", "02" }
                                             div {
-                                                div { class: "pipeline-title", "Logic Depth" }
-                                                p { class: "pipeline-copy", "Contains {detail.get(\"steps\").and_then(|i| i.as_array()).map(|a| a.len()).unwrap_or(0)} individual steps." }
+                                                div { class: "pipeline-title", "Logic Density" }
+                                                p { style: "color: var(--text-secondary); font-size: 13px;", 
+                                                    "Orchestrated across {detail.get(\"steps\").and_then(|i| i.as_array()).map(|a| a.len()).unwrap_or(0)} discrete states." 
+                                                }
                                             }
                                         }
                                     }
                                 }
                             }
 
-                            section { class: "card",
-                                div { class: "card-header",
-                                    div {
-                                        div { class: "card-title", "Resource Posture" }
-                                        div { class: "card-description", "Immutable artifacts for this release." }
-                                    }
-                                }
-                                ul { class: "sidebar-nav", style: "padding: 0;",
-                                    div { class: "nav-item", span { class: "nav-icon", "JSON" } span { "AST Representation" } }
-                                    div { class: "nav-item", span { class: "nav-icon", "TXT" } span { "RheLang Source" } }
-                                    div { class: "nav-item", span { class: "nav-icon", "BIN" } span { "Compiled IR" } }
+                            section { class: "studio-glass-card",
+                                div { class: "studio-label", "Asset Inventory" }
+                                div { class: "sidebar-nav", style: "margin-top: 16px;",
+                                    div { class: "nav-item", span { class: "nav-icon", "◇" } span { "AST Representation (JSON)" } }
+                                    div { class: "nav-item", span { class: "nav-icon", "◇" } span { "RheLang Source (Raw)" } }
+                                    div { class: "nav-item", span { class: "nav-icon", "◇" } span { "Compiled IR (Binary)" } }
                                 }
                             }
                         }
                     }
                 },
                 DetailTab::Logic => rsx! {
-                    section { class: "card",
-                        div { class: "card-header",
-                            div {
-                                div { class: "card-title", "RheLang Source code" }
-                                div { class: "card-description", "Final source that generated this release." }
-                            }
-                        }
+                    section { class: "studio-glass-card",
+                        div { class: "studio-label", "Compiled RheLang Source" }
                         if let Some(Some(detail)) = detail_res.read().as_ref() {
                             pre { 
-                                class: "code-block", 
-                                style: "background: #08080A; padding: 24px; border-radius: 4px; border: 1px solid var(--border); max-height: 600px; overflow: auto;",
-                                "{detail.get(\"source\").and_then(|v| v.as_str()).unwrap_or(\"No source\")}" 
+                                class: "ide-panel", 
+                                style: "margin-top: 16px; font-size: 13px;",
+                                "{detail.get(\"source\").and_then(|v| v.as_str()).unwrap_or(\"No audit data.\")}" 
                             }
                         }
                     }
                 },
                 DetailTab::Visual => rsx! {
-                    section { class: "card",
-                        div { class: "card-header",
-                            div {
-                                div { class: "card-title", "Interactive Visual Flow" }
-                                div { class: "card-description", "Deterministic path analysis based on the compiled AST." }
-                            }
-                        }
-                        div { class: "vg-canvas",
+                    div { class: "studio-theme", 
+                        style: "border-radius: var(--radius-lg); overflow: hidden; border: 1px solid var(--border-subtle);",
+                        div { class: "builder-pane-header", "Forensic Visualizer" }
+                        div { class: "vg-canvas-svg", style: "height: 600px;",
                             if let Some(Some(detail)) = detail_res.read().as_ref() {
                                 if let Some(ast_str) = detail.get("ast_json").and_then(|v| v.as_str()) {
                                     if let Ok(ast) = serde_json::from_str::<serde_json::Value>(ast_str) {
@@ -168,22 +152,15 @@ pub fn ViewGenWorkflow(props: ViewGenWorkflowProps) -> Element {
                     }
                 },
                 DetailTab::Audit => rsx! {
-                    section { class: "card",
-                        div { class: "card-header",
-                            div {
-                                div { class: "card-title", "Execution History" }
-                                div { class: "card-description", "Every trace recorded for this specific version." }
-                            }
-                        }
-                        div { class: "type-table",
+                    section { class: "studio-glass-card",
+                        div { class: "studio-label", "Execution Forensic History" }
+                        div { class: "type-table", style: "margin-top: 16px;",
                             div { class: "type-row type-row-head",
                                 div { "Trigger" }
                                 div { "Status" }
                                 div { "Timestamp" }
-                                div { "Audit Trace" }
+                                div { "Trace ID" }
                             }
-                            // Using the activity list but filtered if the component supported it. 
-                            // For now, it shows workspace activity.
                             crate::components::activity_list::ActivityList { 
                                 on_select: move |_| {} 
                             }
@@ -194,3 +171,4 @@ pub fn ViewGenWorkflow(props: ViewGenWorkflowProps) -> Element {
         }
     }
 }
+

@@ -303,8 +303,7 @@ pub async fn generate_workflow(prompt: &str) -> Result<GenerateResponse, String>
     let req = GenerateRequest {
         prompt: prompt.to_string(),
     };
-    let res = client()
-        .post(format!("{}/workflows/generate", &*API_BASE))
+    let res = authorized_request(reqwest::Method::POST, format!("{}/workflows/generate", &*API_BASE))
         .json(&req)
         .send()
         .await
@@ -393,11 +392,12 @@ pub async fn get_integrations() -> Result<Vec<String>, String> {
     }
 }
 
-/// Update integration credentials.
-pub async fn update_integration(name: &str, api_key: &str) -> Result<(), String> {
+/// Update integration credentials and configuration.
+pub async fn update_integration(name: &str, api_key: &str, config: serde_json::Value) -> Result<(), String> {
     let payload = serde_json::json!({
         "name": name,
         "api_key": api_key,
+        "config": config,
     });
 
     let res = authorized_request(reqwest::Method::POST, format!("{}/integrations", &*API_BASE))
@@ -410,6 +410,53 @@ pub async fn update_integration(name: &str, api_key: &str) -> Result<(), String>
         Ok(())
     } else {
         Err(format!("Integration update failed with HTTP {}", res.status()))
+    }
+}
+
+/// Webhook Management
+pub async fn list_webhooks() -> Result<Vec<serde_json::Value>, String> {
+    let res = authorized_request(reqwest::Method::GET, format!("{}/webhooks", &*API_BASE))
+        .send()
+        .await
+        .map_err(|e| format!("Connection failed: {}", e))?;
+
+    if res.status().is_success() {
+        res.json::<Vec<serde_json::Value>>().await.map_err(|e| format!("Parse failed: {}", e))
+    } else {
+        Err(format!("Failed to list webhooks: {}", res.status()))
+    }
+}
+
+pub async fn create_webhook(name: &str, workflow_name: &str, version: &str) -> Result<String, String> {
+    let payload = serde_json::json!({
+        "name": name,
+        "workflow_name": workflow_name,
+        "version": version,
+    });
+    let res = authorized_request(reqwest::Method::POST, format!("{}/webhooks", &*API_BASE))
+        .json(&payload)
+        .send()
+        .await
+        .map_err(|e| format!("Connection failed: {}", e))?;
+
+    if res.status().is_success() {
+        let json = res.json::<serde_json::Value>().await.map_err(|e| format!("Parse failed: {}", e))?;
+        Ok(json["webhook_id"].as_str().unwrap_or_default().to_string())
+    } else {
+        Err(format!("Failed to create webhook: {}", res.status()))
+    }
+}
+
+pub async fn delete_webhook(id: &str) -> Result<(), String> {
+    let res = authorized_request(reqwest::Method::POST, format!("{}/webhooks/{}", &*API_BASE, id))
+        .send()
+        .await
+        .map_err(|e| format!("Connection failed: {}", e))?;
+
+    if res.status().is_success() {
+        Ok(())
+    } else {
+        Err(format!("Failed to delete webhook: {}", res.status()))
     }
 }
 

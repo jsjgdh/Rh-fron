@@ -102,29 +102,30 @@ pub fn Home(#[props(default)] on_login: EventHandler<AuthResponse>) -> Element {
 
                     div { class: "landing-panel",
                         if *show_auth.read() {
-                            div { class: "auth-overlay card glassmorphic",
+                            div { class: "auth-overlay",
                                 div { 
                                     style: "display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 32px;",
                                     div {
-                                        div { class: "card-title", if *is_signup.read() { "Create Account" } else { "Welcome Back" } }
-                                        div { class: "card-description", if *is_signup.read() { "Join the Rhexiom network." } else { "Sign in to your workspace." } }
+                                        div { class: "label-caps", style: "margin-bottom: 4px;", "Workspace Entry" }
+                                        h2 { class: "hero-title", style: "font-size: 32px; margin-bottom: 8px;", if *is_signup.read() { "Create Account" } else { "Welcome Back" } }
+                                        p { class: "hero-copy", style: "font-size: 14px;", if *is_signup.read() { "Join the Rhexiom network." } else { "Sign in to your workspace." } }
                                     }
                                     button { class: "btn-close", onclick: move |_| show_auth.set(false), "×" }
                                 }
                                 
                                 div { class: "auth-form",
                                     div { class: "form-group",
-                                        label { class: "form-label", "Email" }
+                                        label { class: "form-label", "Email Address" }
                                         input {
                                             class: "form-input",
                                             r#type: "email",
-                                            placeholder: "you@company.com",
+                                            placeholder: "you@enterprise.com",
                                             value: "{email}",
                                             oninput: move |e| email.set(e.value())
                                         }
                                     }
                                     div { class: "form-group",
-                                        label { class: "form-label", "Password" }
+                                        label { class: "form-label", "Access Key" }
                                         input {
                                             class: "form-input",
                                             r#type: "password",
@@ -143,7 +144,7 @@ pub fn Home(#[props(default)] on_login: EventHandler<AuthResponse>) -> Element {
                                         style: "margin-top: 12px;",
                                         disabled: *loading.read(),
                                         onclick: handle_auth,
-                                        if *loading.read() { "Processing..." } else { if *is_signup.read() { "Create account" } else { "Sign in" } }
+                                        if *loading.read() { "Processing..." } else { if *is_signup.read() { "Initialize account" } else { "Enter workspace" } }
                                     }
 
                                     div { class: "auth-switch",
@@ -159,22 +160,23 @@ pub fn Home(#[props(default)] on_login: EventHandler<AuthResponse>) -> Element {
                             }
                         } else {
                             div { class: "landing-viz",
-                                div { class: "signal-card signal-card-accent" ,
-                                    div { class: "signal-label", "Architectural Posture" }
-                                    div { class: "signal-value", "Logic-Transparent" }
-                                    p { class: "signal-copy",
+                                div { class: "industrial-card",
+                                    div { class: "label-caps", "Architectural Posture" }
+                                    h2 { class: "app-title", style: "font-size: 24px; margin: 8px 0;", "Logic-Transparent" }
+                                    p { class: "hero-copy", style: "font-size: 14px;",
                                         "Every step is traceable. Every decision is grounded in the compiled AST."
                                     }
                                 }
 
-                                div { class: "signal-card-grid",
-                                    div { class: "signal-card",
-                                        div { class: "signal-label", "Mode" }
-                                        div { class: "signal-value signal-value-small", "Deterministic" }
+                                div { 
+                                    style: "display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 24px;",
+                                    div { class: "industrial-card",
+                                        div { class: "label-caps", "Mode" }
+                                        div { class: "hero-title", style: "font-size: 18px;", "Deterministic" }
                                     }
-                                    div { class: "signal-card",
-                                        div { class: "signal-label", "Storage" }
-                                        div { class: "signal-value signal-value-small", "Content-Addressed" }
+                                    div { class: "industrial-card",
+                                        div { class: "label-caps", "Storage" }
+                                        div { class: "hero-title", style: "font-size: 18px;", "Content-Addressed" }
                                     }
                                 }
                             }

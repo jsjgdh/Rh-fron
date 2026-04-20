@@ -31,37 +31,23 @@ pub fn ExecutionForm() -> Element {
     });
 
     rsx! {
-        div { class: "page-stack",
-            section { class: "card detail-hero",
-                div { class: "detail-hero-head",
+        div { class: "dashboard-stack control-execution",
+            section { class: "industrial-card glass detail-hero",
+                div { style: "display: flex; justify-content: space-between; align-items: center;",
                     div {
-                        div { class: "section-kicker", "Execution console" }
-                        h2 { class: "section-title", "Run a stored workflow version with typed inputs." }
-                        p { class: "section-copy", "Select a workflow deployment, provide schema-aware values, and inspect the exact trace returned by the runtime." }
+                        div { class: "label-caps", style: "color: var(--accent);", "Execution console" }
+                        h2 { class: "app-title", style: "font-size: 24px; margin-top: 8px;", "Run a stored workflow version with typed inputs." }
+                        p { class: "panel-copy", style: "margin-top: 12px; color: var(--text-secondary);", "Select a workflow deployment, provide schema-aware values, and inspect the exact trace returned by the runtime." }
                     }
-                    span { class: "badge badge-neutral", "runtime" }
+                    span { class: "status-pill", "runtime" }
                 }
             }
 
-            div { class: "grid-2 execution-layout",
-                section { class: "card" ,
-                    div { class: "card-header",
-                        div {
-                            div { class: "card-title", "Input schema" }
-                            div { class: "card-description",
-                                if let (Some(workflow), Some(version)) = (
-                                    selected_workflow.read().clone(),
-                                    selected_version.read().clone(),
-                                ) {
-                                    "{workflow} · {version}"
-                                } else {
-                                    "Choose a workflow version to populate the form."
-                                }
-                            }
-                        }
-                    }
-
-                    div { class: "form-group",
+            div { class: "grid-metrics", style: "grid-template-columns: 1fr 1fr;",
+                section { class: "industrial-card" ,
+                    div { class: "label-caps", "Input Deployment" }
+                    
+                    div { class: "form-group", style: "margin-top: 24px;",
                         label { class: "form-label", "Workflow version" }
                         select {
                             class: "form-input",
@@ -95,7 +81,7 @@ pub fn ExecutionForm() -> Element {
                         if let Some(ast_str) = detail.get("ast_json").and_then(|value| value.as_str()) {
                             if let Ok(ast) = serde_json::from_str::<serde_json::Value>(ast_str) {
                                 if let Some(inputs) = ast.get("inputs").and_then(|value| value.as_array()) {
-                                    div { class: "dynamic-form",
+                                    div { class: "dynamic-form", style: "margin-top: 32px;",
                                         {
                                             inputs.iter().map(|input| {
                                                 let name = input
@@ -119,15 +105,16 @@ pub fn ExecutionForm() -> Element {
                                                         div { class: "form-group",
                                                             label { class: "form-label",
                                                                 "{name}"
-                                                                span { class: "form-label-type", "boolean" }
+                                                                span { style: "color: var(--text-faint); font-weight: 500; margin-left: 8px;", "boolean" }
                                                             }
-                                                            div { class: "toggle-group",
+                                                            div { style: "display: flex; gap: 8px;",
                                                                 button {
                                                                     class: if current_value == "true" {
-                                                                        "toggle-option active"
+                                                                        "btn btn-primary"
                                                                     } else {
-                                                                        "toggle-option"
+                                                                        "btn btn-secondary"
                                                                     },
+                                                                    style: "flex: 1;",
                                                                     onclick: {
                                                                         let name = name.clone();
                                                                         move |_| {
@@ -138,10 +125,11 @@ pub fn ExecutionForm() -> Element {
                                                                 }
                                                                 button {
                                                                     class: if current_value == "false" || current_value.is_empty() {
-                                                                        "toggle-option active"
+                                                                        "btn btn-primary"
                                                                     } else {
-                                                                        "toggle-option"
+                                                                        "btn btn-secondary"
                                                                     },
+                                                                    style: "flex: 1;",
                                                                     onclick: {
                                                                         let name = name.clone();
                                                                         move |_| {
@@ -158,7 +146,7 @@ pub fn ExecutionForm() -> Element {
                                                         div { class: "form-group",
                                                             label { class: "form-label",
                                                                 "{name}"
-                                                                span { class: "form-label-type", "{field_type.to_lowercase()}" }
+                                                                span { style: "color: var(--text-faint); font-weight: 500; margin-left: 8px;", "{field_type.to_lowercase()}" }
                                                             }
                                                             input {
                                                                 class: "form-input",
@@ -182,16 +170,17 @@ pub fn ExecutionForm() -> Element {
                             }
                         }
                     } else {
-                        div { class: "empty-state subtle",
-                            div { class: "empty-state-icon", "01" }
-                            div { class: "empty-state-text", "Pick a workflow version to generate the input form." }
+                        div { style: "margin-top: 48px; text-align: center; color: var(--text-faint);",
+                            div { class: "label-caps", style: "font-size: 24px; opacity: 0.1;", "01" }
+                            p { style: "font-size: 14px; margin-top: 12px;", "Pick a workflow version to generate the input form." }
                         }
                     }
 
-                    div { class: "divider" }
+                    div { style: "border-top: 1px solid var(--border); margin: 32px 0;" }
 
                     button {
-                        class: "btn btn-primary full-width",
+                        class: "btn btn-primary",
+                        style: "width: 100%;",
                         disabled: selected_workflow.read().is_none(),
                         onclick: move |_| {
                             let workflow = selected_workflow.read().clone();
@@ -270,51 +259,55 @@ pub fn ExecutionForm() -> Element {
                     }
                 }
 
-                section { class: "card",
-                    div { class: "card-header",
+                section { class: "industrial-card",
+                    div { style: "display: flex; justify-content: space-between; align-items: flex-start;",
                         div {
-                            div { class: "card-title", "Execution trace" }
-                            div { class: "card-description", "Every visited step is listed in order as the runtime reports it." }
+                            div { class: "label-caps", "Execution trace" }
+                            p { class: "panel-copy", style: "font-size: 13px; color: var(--text-secondary);", "Every visited step is listed in order as the runtime reports it." }
                         }
                         if let Some(result) = execution_result.read().as_ref() {
-                            div { class: "trace-header-stats",
+                            div { style: "display: flex; gap: 8px; align-items: center;",
                                 if result.success {
-                                    span { class: "badge badge-success", "pass" }
+                                    span { class: "status-pill status-pill-success", "pass" }
                                 } else {
-                                    span { class: "badge badge-danger", "fail" }
+                                    span { class: "status-pill status-pill-danger", "fail" }
                                 }
-                                span { class: "telemetry-stat", "took {result.total_duration_us}µs" }
+                                span { style: "font-size: 11px; color: var(--text-faint); font-weight: 600;", "{result.total_duration_us}µs" }
                             }
                         } else {
-                            span { class: "badge badge-neutral", "waiting" }
+                            span { class: "status-pill", "waiting" }
                         }
                     }
 
                     if let Some(result) = execution_result.read().as_ref() {
-                        div { class: "trace-summary",
-                            span { class: "trace-summary-label", "Final step" }
-                            span { class: "badge badge-neutral", "{result.final_step}" }
+                        div { 
+                            class: "industrial-card glass",
+                            style: "margin-top: 32px; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center;",
+                            span { class: "label-caps", style: "margin: 0; font-size: 10px;", "Final decision" }
+                            span { class: "brand-name", style: "color: var(--text-primary); font-size: 13px;", "{result.final_step}" }
                         }
-                        div { class: "trace-list",
+                        
+                        div { class: "trace-timeline", style: "margin-top: 32px; display: flex; flex-direction: column; gap: 12px;",
                             for (index, (step_name, action, timestamp)) in result.steps.iter().enumerate() {
-                                div { class: "trace-step",
-                                    div { class: "trace-step-number", "{index + 1}" }
-                                    div { class: "trace-step-body",
-                                        div { class: "trace-step-main",
-                                            div { class: "trace-step-name", "{step_name}" }
-                                            span { class: "trace-step-time", "+{timestamp}µs" }
+                                div { 
+                                    style: "display: flex; gap: 16px; padding: 12px; border-bottom: 1px solid var(--border); align-items: center;",
+                                    div { class: "nav-icon", style: "font-size: 10px; flex-shrink: 0;", "{index + 1}" }
+                                    div { style: "flex: 1;",
+                                        div { style: "display: flex; justify-content: space-between;",
+                                            span { style: "font-weight: 600; font-size: 14px;", "{step_name}" }
+                                            span { style: "color: var(--text-faint); font-size: 11px;", "+{timestamp}µs" }
                                         }
                                         if let Some(action) = action {
-                                            div { class: "trace-step-action", "{action}" }
+                                            div { style: "font-size: 12px; color: var(--text-secondary); margin-top: 2px;", "{action}" }
                                         }
                                     }
                                 }
                             }
                         }
                     } else {
-                        div { class: "empty-state",
-                            div { class: "empty-state-icon", "02" }
-                            div { class: "empty-state-text", "Run a workflow to see the step trace and final state here." }
+                        div { style: "margin-top: 80px; text-align: center; color: var(--text-faint);",
+                            div { class: "label-caps", style: "font-size: 24px; opacity: 0.1;", "02" }
+                            p { style: "font-size: 14px; margin-top: 12px;", "Run a workflow to see the step trace and final state here." }
                         }
                     }
                 }

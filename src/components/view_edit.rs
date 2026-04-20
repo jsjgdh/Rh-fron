@@ -3,12 +3,12 @@ use crate::components::workflow_graph::WorkflowGraph;
 
 #[derive(PartialEq, Props, Clone)]
 pub struct ViewEditProps {
-    workflow_name: String,
-    version: String,
+    pub workflow_name: String,
+    pub version: String,
     #[props(default)]
-    on_back: EventHandler<()>,
+    pub on_back: EventHandler<()>,
     #[props(default)]
-    on_recompiled: EventHandler<(String, String)>,
+    pub on_recompiled: EventHandler<(String, String)>,
 }
 
 #[component]
@@ -51,103 +51,117 @@ pub fn ViewEdit(props: ViewEditProps) -> Element {
         .unwrap_or_default();
 
     rsx! {
-        div { class: "builder-container",
-            // ── Left Pane: Step Navigator ────────────────────────────
-            aside { class: "builder-pane",
-                div { class: "builder-pane-header", "Steps" }
-                div { class: "sidebar-nav",
-                    for step in steps.iter() {
-                        {
-                            let name = step.get("name").and_then(|v| v.as_str()).unwrap_or("?").to_string();
-                            let is_active = selected_step.read().as_ref() == Some(&name);
-                            rsx! {
-                                div { 
-                                    class: if is_active { "nav-item active" } else { "nav-item" },
-                                    onclick: {
-                                        let name = name.clone();
-                                        move |_| selected_step.set(Some(name.clone()))
-                                    },
-                                    span { class: "nav-icon", "•" }
-                                    span { "{name}" }
+        div { class: "studio-theme", style: "height: 100vh; overflow: hidden;",
+            div { class: "studio-workbench",
+                
+                // ─── Studio Shell ────────────────────────────────────────
+                div { class: "builder-container",
+                
+                // 1. Left: Forensic Explorer
+                aside { class: "builder-pane",
+                    div { class: "builder-pane-header", "Forensic Step Explorer" }
+                    div { class: "sidebar-nav",
+                        for step in steps.iter() {
+                            {
+                                let name = step.get("name").and_then(|v| v.as_str()).unwrap_or("?").to_string();
+                                let is_active = selected_step.read().as_ref() == Some(&name);
+                                rsx! {
+                                    div { 
+                                        class: if is_active { "nav-item active" } else { "nav-item" },
+                                        onclick: {
+                                            let name = name.clone();
+                                            move |_| selected_step.set(Some(name.clone()))
+                                        },
+                                        span { class: "nav-icon", "◇" }
+                                        span { "{name}" }
+                                    }
                                 }
+                            }
+                        }
+                    }
+                    
+                    div { style: "margin-top: auto; padding: 16px; border-top: 1px solid var(--border-subtle);",
+                        button {
+                            class: "btn btn-secondary",
+                            style: "width: 100%; height: 36px; font-size: 11px;",
+                            onclick: move |_| on_back.call(()),
+                            "Close Studio"
+                        }
+                    }
+                }
+
+                // 2. Center: Forensic Visual Graph
+                main { class: "builder-pane",
+                    div { class: "builder-pane-header", 
+                        "Forensic Canvas"
+                        span { style: "margin-left: auto; color: var(--text-faint); font-weight: 400; font-size: 10px;", 
+                            "{workflow_name} • {version}"
+                        }
+                    }
+                    div { class: "vg-canvas-svg",
+                        if let Some(ast) = ast_payload.read().clone() {
+                            WorkflowGraph { 
+                                injected_ast: ast,
+                                active_steps: selected_step.read().as_ref().map(|s| vec![s.clone()])
+                            }
+                        } else {
+                            div { class: "empty-state", 
+                                div { class: "pulse-ring" }
+                                span { "Initializing visualization..." } 
+                            }
+                        }
+                    }
+                }
+
+                // 3. Right: Logic Panel (IDE)
+                aside { class: "builder-pane",
+                    div { class: "builder-pane-header", "Logic Inspector" }
+                    div { class: "inspector-content",
+                        style: "height: 100%; display: flex; flex-direction: column;",
+                        
+                        div { class: "ide-panel", style: "flex: 1; display: flex; flex-direction: column;",
+                            div { class: "label-caps", style: "margin-bottom: 8px;", "Current RheLang Source" }
+                            textarea {
+                                class: "ide-textarea",
+                                value: "{source_code}",
+                                oninput: move |e| source_code.set(e.value()),
+                                spellcheck: false,
+                            }
+                        }
+
+                        if !compile_error.read().is_empty() {
+                            div { class: "badge badge-danger", style: "margin: 12px; border-radius: 4px;", 
+                                "{compile_error}" 
+                            }
+                        }
+
+                        div { style: "padding: 16px; background: rgba(0,0,0,0.2);",
+                            button {
+                                class: "btn btn-primary",
+                                style: "width: 100%; height: 48px; font-weight: 700;",
+                                disabled: *compiling.read(),
+                                onclick: move |_| {
+                                    let source = source_code.read().clone();
+                                    compiling.set(true);
+                                    compile_error.set(String::new());
+                                    spawn(async move {
+                                        match crate::api::compile_workflow(&source).await {
+                                            Ok(res) if res.success => {
+                                                on_recompiled.call((res.workflow_name, res.version));
+                                            }
+                                            Ok(res) => compile_error.set(res.error.unwrap_or_else(|| "Logic audit failed.".into())),
+                                            Err(e) => compile_error.set(e),
+                                        }
+                                        compiling.set(false);
+                                    });
+                                },
+                                if *compiling.read() { "Auditing Logic..." } else { "Compile & Release" }
                             }
                         }
                     }
                 }
             }
-
-            // ── Center Pane: Visual Flow ─────────────────────────────
-            main { class: "builder-pane",
-                div { class: "builder-pane-header", 
-                    "Visual Flow"
-                    span { style: "margin-left: auto; color: var(--text-faint); font-weight: 400;", 
-                        "v{version}"
-                    }
-                }
-                div { class: "vg-canvas",
-                    if let Some(ast) = ast_payload.read().clone() {
-                        WorkflowGraph { 
-                            injected_ast: ast,
-                            active_steps: selected_step.read().as_ref().map(|s| vec![s.clone()])
-                        }
-                    } else {
-                        div { class: "empty-state", "Loading graph..." }
-                    }
-                }
-            }
-
-            // ── Right Pane: Inspector & Logic ────────────────────────
-            aside { class: "builder-pane",
-                div { class: "builder-pane-header", "Properties" }
-                div { class: "inspector-content",
-                    style: "padding: 16px; display: flex; flex-direction: column; gap: 20px;",
-                    
-                    div { class: "form-group",
-                        label { class: "form-label", "RheLang Source" }
-                        textarea {
-                            class: "form-input code-editor",
-                            style: "height: 400px; font-size: 11px;",
-                            value: "{source_code}",
-                            oninput: move |e| source_code.set(e.value()),
-                            spellcheck: false,
-                        }
-                    }
-
-                    if !compile_error.read().is_empty() {
-                        div { class: "badge badge-danger", style: "width: 100%; justify-content: flex-start;", 
-                            "{compile_error}" 
-                        }
-                    }
-
-                    button {
-                        class: "btn btn-primary",
-                        style: "width: 100%",
-                        disabled: *compiling.read(),
-                        onclick: move |_| {
-                            let source = source_code.read().clone();
-                            compiling.set(true);
-                            spawn(async move {
-                                match crate::api::compile_workflow(&source).await {
-                                    Ok(res) if res.success => {
-                                        on_recompiled.call((res.workflow_name, res.version));
-                                    }
-                                    Ok(res) => compile_error.set(res.error.unwrap_or_default()),
-                                    Err(e) => compile_error.set(e),
-                                }
-                                compiling.set(false);
-                            });
-                        },
-                        if *compiling.read() { "Compiling..." } else { "Compile & Release" }
-                    }
-
-                    button {
-                        class: "btn btn-secondary",
-                        style: "width: 100%",
-                        onclick: move |_| on_back.call(()),
-                        "Close Builder"
-                    }
-                }
-            }
         }
     }
+}
 }
