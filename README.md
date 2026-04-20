@@ -1,26 +1,22 @@
-# Rhexiom Studio V2: Forensic Execution Platform
+# Rhexiom Frontend: Studio V2 (Obsidian Forensic Console)
+**High-Fidelity Management Console for Post-Sovereign Policy Orchestration.**
 
-The high-fidelity frontend for Rhexiom, harmonized with the **Obsidian Forensic Design System**. Built with Dioxus and Rust-WASM for high-performance data transparency.
+## 🎭 The Rhexiom Aesthetic
+The frontend adheres to the **Obsidian Forensic** design system. Every component must prioritize data-density, high-fidelity contrast, and professional-tier industrial depth.
 
-## Studio V2 Features
-- **Control Tower**: Unified cockpit for workflow orchestration and telemetry monitoring.
-- **Policy Studio**: Advanced bulk deconstruction of PDF policies into executable forensic blueprints.
-- **Execution Sandbox**: Glassmorphic terminal for real-time trace testing.
-- **Service Registry**: Unified management for integrations (HubSpot, Salesforce, Email).
+## 🏗️ Design System Invariants
+- **Theme**: Deep Dark (Obsidian) with Glassmorphic depth.
+- **Palette**: Deep Gray (#0A0A0B), Emerald Highlights, Translucent Panels.
+- **Components**: Use `industrial-card`, `glass-panel`, and `status-pill-forensic` classes exclusively.
+- **No Hardcoded Styles**: All semantic tokens must be mapped to the global `main.css` design system.
 
-## Design System: Obsidian Forensic
-The UI utilizes a deep-dark, high-depth aesthetic to ensure high-fidelity visibility of forensic data:
-- **Palette**: Deep-slate background (#0B0C0E) with glassmorphic depth tokens.
-- **Typography**: Inter (UI) and JetBrains Mono (Code/Forensic).
-- **Interactions**: Subtle micro-animations and status-pill telemetry for real-time state visualization.
+## 🛠️ Core Modules
+- **Policy Studio**: The AI-augmented deconstruction and bulk creation workbench.
+- **Execution Sandbox**: The high-fidelity forensic replay and audit environment.
+- **Service Registry**: The central control room for HubSpot, Salesforce, and Email integrations.
 
-## Technical Stack
-- **Framework**: Dioxus (Rust-native frontend).
-- **WASM**: Compiled via `wasm-bindgen` for near-native performance.
-- **Styling**: Vanilla CSS leveraging CSS Variables for global Obsidian tokens.
-- **Client**: `Reqwest` and `Gloo-net` for high-concurrency API orchestration.
-
-## Development
-1. Ensure `dx` CLI is installed: `cargo install dioxus-cli`
-2. `dx serve` for local dev (Proxying to Backend on Port 3001).
-3. `dx build --release` for high-performance production bundles.
+## 🚀 Development
+```bash
+# Launch the dev server with proxy to :3001
+dx serve
+```
