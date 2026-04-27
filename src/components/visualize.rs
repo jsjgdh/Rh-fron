@@ -84,7 +84,10 @@ pub fn Visualize() -> Element {
             }
 
             if *loading.read() {
-                div { style: "padding: 40px; text-align: center; color: var(--text-faint);", "Synthesizing graph symbols..." }
+                div { style: "padding: 40px; text-align: center;",
+                    div { class: "spinner spinner-lg", style: "margin: 0 auto 16px;" }
+                    div { style: "color: var(--text-faint);", "Synthesizing graph symbols..." }
+                }
             } else if let Some(err) = error.read().as_ref() {
                 div { class: "status-pill status-pill-danger", style: "display: block; width: fit-content; margin: 0 auto;", "{err}" }
             } else if let Some(detail) = workflow_detail.read().as_ref() {

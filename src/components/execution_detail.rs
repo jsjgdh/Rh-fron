@@ -30,15 +30,24 @@ pub fn ExecutionDetail(id: String) -> Element {
     let wf_state = workflow.read();
 
     if let Some(Ok(data)) = &*exec_state {
-        let trace = data["trace"].as_object();
-        let steps = trace.and_then(|t| t.get("steps")).and_then(|s| s.as_array());
+        // Handle trace as either an object with steps or a direct array
+        let trace_obj = data["trace"].as_object();
+        let steps = trace_obj
+            .and_then(|t| t.get("steps"))
+            .and_then(|s| s.as_array())
+            .or_else(|| data["trace"].as_array());
         let active_steps: Vec<String> = steps
+            .clone()
             .map(|s| {
                 s.iter()
                     .filter_map(|step| step["step_name"].as_str().map(String::from))
                     .collect()
             })
             .unwrap_or_default();
+        let total_duration_us = trace_obj
+            .and_then(|t| t.get("total_duration_us"))
+            .and_then(|d| d.as_u64())
+            .unwrap_or(0);
 
         let status = data["status"].as_str().unwrap_or_default();
         let status_lower = status.to_lowercase();
@@ -109,7 +118,7 @@ pub fn ExecutionDetail(id: String) -> Element {
                         div { class: "card-header",
                             div {
                                 div { class: "card-title", "Step-by-Step Audit" }
-                                div { class: "card-description", "Deterministic decision log." }
+                                div { class: "card-description", "Deterministic decision log. Total duration: {total_duration_us}µs" }
                             }
                         }
                         div { class: "pipeline-list",
@@ -137,6 +146,11 @@ pub fn ExecutionDetail(id: String) -> Element {
             }
         }
     } else {
-        rsx! { div { class: "status-message", "Retrieving audit data from ledger..." } }
+        rsx! {
+            div { class: "empty-state",
+                div { class: "spinner spinner-lg", style: "margin-bottom: 24px;" }
+                div { "Retrieving audit data from ledger..." }
+            }
+        }
     }
 }

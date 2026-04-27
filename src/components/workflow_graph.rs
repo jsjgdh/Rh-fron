@@ -21,13 +21,29 @@ const DIAMOND_SIZE: f64 = 60.0;
 const HORIZONTAL_GAP: f64 = 120.0;
 const VERTICAL_GAP: f64 = 160.0;
 
+/// Provider-based icon mapping for workflow actions.
+/// Extracts the provider prefix from action names (e.g., "salesforce_query" -> "salesforce")
 fn get_icon(action: &str) -> &'static str {
     let lower = action.to_lowercase();
-    if lower.contains("hubspot") { "◎" }
-    else if lower.contains("salesforce") { "☁" }
-    else if lower.contains("email") || lower.contains("notify") { "✉" }
-    else if lower.contains("webhook") || lower.contains("http") { "⇄" }
-    else { "◆" }
+    
+    // Extract provider from action name (format: "provider_action")
+    let provider = lower.split('_').next().unwrap_or("");
+    
+    match provider {
+        "hubspot" => "◎",
+        "salesforce" => "☁",
+        "email" => "✉",
+        "slack" => "#",
+        "datadog" => "⚡",
+        "stripe" => "S",
+        "webhook" => "⇄",
+        "http" => "⇄",
+        _ => {
+            // Fallback to substring matching for legacy actions
+            if lower.contains("notify") { "✉" }
+            else { "◆" }
+        }
+    }
 }
 
 // ── Graph State ──────────────────────────────────────────────────

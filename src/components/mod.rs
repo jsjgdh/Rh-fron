@@ -17,3 +17,7 @@ pub mod integrations;
 pub mod visualize;
 pub mod execution_detail;
 pub mod navbar;
+pub mod view_diff;
+pub mod workflow_history;
+pub mod animated_bg;
+pub mod mfa_setup;

@@ -38,7 +38,12 @@ pub fn ActivityList(props: ActivityListProps) -> Element {
                         }
                     }
                 }
-                None => rsx! { div { style: "padding: 40px; text-align: center; color: var(--text-faint); font-size: 14px;", "Synchronizing records..." } }
+                None => rsx! {
+                    div { style: "padding: 40px; text-align: center;",
+                        div { class: "spinner", style: "margin: 0 auto 16px;" }
+                        div { style: "color: var(--text-faint); font-size: 14px;", "Synchronizing records..." }
+                    }
+                }
             }
         }
     }
@@ -68,7 +73,12 @@ fn ActivityRow(name: String, status: String, mode: String, created: String, id: 
             }
             div { style: "display: flex; align-items: center; gap: 20px;",
                 span { style: "font-size: 12px; color: var(--text-faint);", "{date_part}" }
-                span { class: "mono", style: "font-size: 11px; opacity: 0.7;", "{id_short}" }
+                span {
+                    class: "mono",
+                    style: "font-size: 11px; opacity: 0.7;",
+                    aria_label: "Execution ID",
+                    "{id_short}"
+                }
             }
         }
     }

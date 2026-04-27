@@ -28,7 +28,7 @@ pub fn VersionList() -> Element {
                                             {
                                                 let name = wf.name.clone();
                                                 let versions = wf.versions.clone();
-                                                let ver = versions.first().cloned().unwrap_or_else(|| "v1.0".to_string());
+                                                let ver = versions.last().cloned().unwrap_or_else(|| "v1.0".to_string());
                                                 let is_active = selected_wf.read().as_ref().map(|(n, _v)| n == &name).unwrap_or(false);
                                                 rsx! {
                                                     div { 
@@ -50,7 +50,12 @@ pub fn VersionList() -> Element {
                                     }
                                 }
                             },
-                            _ => rsx! { div { style: "padding: 24px; color: var(--text-faint); font-size: 13px;", "Syncing Ledger..." } }
+                            _ => rsx! {
+                                div { style: "padding: 40px; text-align: center;",
+                                    div { class: "spinner", style: "margin: 0 auto 16px;" }
+                                    div { style: "color: var(--text-faint); font-size: 14px;", "Syncing Ledger..." }
+                                }
+                            }
                         }
                     }
                 }
@@ -91,7 +96,7 @@ fn ArtifactDetails(name: String, ver: String) -> Element {
 
             match details.read().as_ref() {
                 Some(Some(data)) => {
-                    let dsl = data["dsl_content"].as_str().unwrap_or("");
+                    let dsl = data["source"].as_str().unwrap_or("");
                     rsx! {
                         div { class: "section-title", "SOURCE RHEXIOM" }
                         div { class: "card", style: "padding: 0;",
@@ -112,7 +117,12 @@ fn ArtifactDetails(name: String, ver: String) -> Element {
                         }
                     }
                 },
-                _ => rsx! { div { "Syncing bytes..." } }
+                _ => rsx! {
+                    div { style: "padding: 40px; text-align: center;",
+                        div { class: "spinner", style: "margin: 0 auto 16px;" }
+                        div { style: "color: var(--text-faint);", "Syncing bytes..." }
+                    }
+                }
             }
         }
     }

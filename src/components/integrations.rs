@@ -16,9 +16,9 @@ pub fn Integrations() -> Element {
     let mut imap_port = use_signal(|| "993".to_string());
     let mut imap_user = use_signal(|| String::new());
     
-    // Multi-mapping state: Vec<(subject, workflow)>
+    // Multi-mapping state: Vec<(subject, workflow, version)>
     let mut email_mappings = use_signal(|| vec![
-        ("leave approval".to_string(), "LeavePolicy".to_string())
+        ("leave approval".to_string(), "LeavePolicy".to_string(), "v1.0".to_string())
     ]);
 
     let mut webhooks = use_resource(api::list_webhooks);
@@ -54,18 +54,36 @@ pub fn Integrations() -> Element {
                                                         div { style: "font-weight: 600; font-size: 15px;", "{hook_name}" }
                                                         div { style: "font-size: 11px; color: var(--text-faint); margin-top: 4px;", "Triggers {wf_name} ({wf_ver})" }
                                                     }
-                                                    button { 
-                                                        class: "btn", 
-                                                        style: "padding: 4px 8px; border: none;",
+                                                     button {
+                                                        class: "btn btn-ghost",
+                                                        style: "padding: 4px 8px; border: none; color: var(--status-error);",
+                                                        aria_label: "Delete webhook {hook_name}",
                                                         onclick: move |_| {
                                                             let hid = hook_id.clone();
+                                                            let hname = hook_name.clone();
                                                             let mut webhooks = webhooks.clone();
-                                                            spawn(async move {
-                                                                let _ = api::delete_webhook(&hid).await;
-                                                                webhooks.restart();
-                                                            });
+                                                            // Show confirmation dialog
+                                                            if web_sys::window()
+                                                                .unwrap()
+                                                                .confirm_with_message(&format!("Are you sure you want to delete the webhook '{}'?
+
+This action cannot be undone.", hname))
+                                                                .unwrap_or(false)
+                                                            {
+                                                                spawn(async move {
+                                                                    match api::delete_webhook(&hid).await {
+                                                                        Ok(()) => {
+                                                                            crate::app::show_toast(format!("Webhook '{}' deleted successfully", hname), crate::app::ToastType::Success);
+                                                                        }
+                                                                        Err(e) => {
+                                                                            crate::app::show_toast(format!("Failed to delete webhook: {}", e), crate::app::ToastType::Error);
+                                                                        }
+                                                                    }
+                                                                    webhooks.restart();
+                                                                });
+                                                            }
                                                         },
-                                                        "✕"
+                                                        span { aria_hidden: "true", "✕" }
                                                     }
                                                 }
                                                 div { style: "margin-top: 16px; padding: 8px; background: var(--bg-secondary); border-radius: 4px;",
@@ -122,25 +140,26 @@ pub fn Integrations() -> Element {
                         for service in services {
                             {
                                 let s = service.clone();
-                                let is_active = *selected_service.read() == *service;
+                                let service_name = s.name.clone();
+                                let is_active = selected_service.read().as_str() == service_name.as_str();
                                 rsx! {
-                                    div { 
+                                    div {
                                         class: if is_active { "card active" } else { "card" },
                                         style: if is_active { "border-color: var(--accent-primary); background: #F0F7FF;" } else { "" },
                                         onclick: move |_| {
-                                            selected_service.set(s.clone());
+                                            selected_service.set(s.name.clone());
                                             status_msg.set(String::new());
                                             api_key.set(String::new());
                                         },
                                         div { style: "display: flex; align-items: center; gap: 12px;",
-                                            div { style: "width: 32px; height: 32px; background: var(--bg-hover); border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 18px;", 
-                                                if s.to_lowercase().contains("salesforce") { "☁" } 
-                                                else if s.to_lowercase().contains("hubspot") { "◎" }
-                                                else if s.to_lowercase() == "email" { "✉" }
-                                                else if s.to_lowercase() == "slack" { "💬" }
+                                            div { style: "width: 32px; height: 32px; background: var(--bg-hover); border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 18px;",
+                                                if service_name.to_lowercase().contains("salesforce") { "☁" }
+                                                else if service_name.to_lowercase().contains("hubspot") { "◎" }
+                                                else if service_name.to_lowercase() == "email" { "✉" }
+                                                else if service_name.to_lowercase() == "slack" { "💬" }
                                                 else { "⇄" }
                                             }
-                                            div { style: "font-weight: 500;", "{service}" }
+                                            div { style: "font-weight: 500;", "{service_name}" }
                                         }
                                     }
                                 }
@@ -148,7 +167,12 @@ pub fn Integrations() -> Element {
                         }
                     }
                 },
-                _ => rsx! { div { style: "padding: 20px; color: var(--text-faint); font-size: 13px;", "Loading services..." } }
+                    _ => rsx! {
+                        div { class: "card", style: "padding: 40px; text-align: center;",
+                            div { class: "spinner", style: "margin: 0 auto 16px;" }
+                            div { style: "color: var(--text-faint); font-size: 14px;", "Loading services..." }
+                        }
+                    }
             }
 
             if !selected_service.read().is_empty() {
@@ -167,12 +191,92 @@ pub fn Integrations() -> Element {
                             div { style: "display: grid; grid-template-columns: 1fr 1fr; gap: 16px;",
                                 div { label { style: "font-size: 11px; font-weight: 600; color: var(--text-faint);", "SMTP Host" } input { value: "{smtp_host}", oninput: move |e| smtp_host.set(e.value()) } }
                                 div { label { style: "font-size: 11px; font-weight: 600; color: var(--text-faint);", "SMTP Port" } input { value: "{smtp_port}", oninput: move |e| smtp_port.set(e.value()) } }
+                                div { label { style: "font-size: 11px; font-weight: 600; color: var(--text-faint);", "IMAP Host" } input { value: "{imap_host}", oninput: move |e| imap_host.set(e.value()) } }
+                                div { label { style: "font-size: 11px; font-weight: 600; color: var(--text-faint);", "IMAP Port" } input { value: "{imap_port}", oninput: move |e| imap_port.set(e.value()) } }
+                                div { style: "grid-column: 1 / span 2;",
+                                    label { style: "font-size: 11px; font-weight: 600; color: var(--text-faint);", "Mailbox User" }
+                                    input { value: "{imap_user}", oninput: move |e| imap_user.set(e.value()) }
+                                }
+                            }
+                            
+                            // Email Mappings Configuration
+                            div { style: "margin-top: 24px; border-top: 1px solid var(--border-subtle); padding-top: 24px;",
+                                div { style: "font-size: 13px; font-weight: 600; margin-bottom: 12px;", "Email-to-Workflow Mappings" }
+                                div { style: "display: flex; flex-direction: column; gap: 8px;",
+                                    {
+                                        let mappings = email_mappings.read().clone();
+                                        rsx! {
+                                            for (idx, (subject, workflow, version)) in mappings.iter().enumerate() {
+                                                div { style: "display: grid; grid-template-columns: 1fr 1fr auto auto; gap: 8px; align-items: center;",
+                                                    input { 
+                                                        placeholder: "Subject pattern (e.g., 'leave approval')",
+                                                        value: "{subject}",
+                                                        oninput: move |e| {
+                                                            let mut mappings = email_mappings.write();
+                                                            if let Some((ref mut s, _, _)) = mappings.get_mut(idx) {
+                                                                *s = e.value();
+                                                            }
+                                                        }
+                                                    }
+                                                    input { 
+                                                        placeholder: "Workflow name",
+                                                        value: "{workflow}",
+                                                        oninput: move |e| {
+                                                            let mut mappings = email_mappings.write();
+                                                            if let Some((_, ref mut w, _)) = mappings.get_mut(idx) {
+                                                                *w = e.value();
+                                                            }
+                                                        }
+                                                    }
+                                                    input { 
+                                                        placeholder: "Version",
+                                                        value: "{version}",
+                                                        style: "width: 80px;",
+                                                        oninput: move |e| {
+                                                            let mut mappings = email_mappings.write();
+                                                            if let Some((_, _, ref mut v)) = mappings.get_mut(idx) {
+                                                                *v = e.value();
+                                                            }
+                                                        }
+                                                    }
+                                                    button {
+                                                        class: "btn",
+                                                        style: "padding: 4px 8px;",
+                                                        onclick: move |_| {
+                                                            let mut mappings = email_mappings.write();
+                                                            if mappings.len() > 1 {
+                                                                mappings.remove(idx);
+                                                            }
+                                                        },
+                                                        "✕"
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                    button {
+                                        class: "btn",
+                                        style: "margin-top: 8px;",
+                                        onclick: move |_| {
+                                            email_mappings.write().push((
+                                                String::new(),
+                                                String::new(),
+                                                "v1.0".to_string()
+                                            ));
+                                        },
+                                        "+ Add Mapping"
+                                    }
+                                }
                             }
                         }
                     }
 
                     if !status_msg.read().is_empty() {
-                        div { style: "margin-bottom: 16px; font-size: 13px; color: var(--accent-primary); font-weight: 500;", "{status_msg}" }
+                        div {
+                            style: "margin-bottom: 16px; padding: 12px 16px; border-radius: 8px; font-size: 13px; font-weight: 500;",
+                            class: if status_msg.read().contains("Error") { "badge badge-error" } else { "badge badge-success" },
+                            "{status_msg}"
+                        }
                     }
 
                     div { style: "display: flex; gap: 12px; margin-top: 24px;",
@@ -183,11 +287,36 @@ pub fn Integrations() -> Element {
                             onclick: move |_| {
                                 let service = selected_service.read().clone();
                                 let key = api_key.read().clone();
+                                let config = if service == "email" {
+                                    serde_json::json!({
+                                        "smtp_host": smtp_host.read().clone(),
+                                        "smtp_port": smtp_port.read().parse::<u16>().unwrap_or(465),
+                                        "imap_host": imap_host.read().clone(),
+                                        "imap_port": imap_port.read().parse::<u16>().unwrap_or(993),
+                                        "user": imap_user.read().clone(),
+                                        "mappings": email_mappings.read().iter().map(|(subject, workflow, version)| {
+                                            serde_json::json!({
+                                                "subject": subject,
+                                                "workflow": workflow,
+                                                "version": version,
+                                            })
+                                        }).collect::<Vec<_>>(),
+                                    })
+                                } else {
+                                    serde_json::json!({})
+                                };
                                 is_loading.set(true);
                                 spawn(async move {
-                                    match api::update_integration(&service, &key, serde_json::json!({})).await {
-                                        Ok(_) => status_msg.set("Configuration saved.".into()),
-                                        Err(e) => status_msg.set(format!("Error: {}", e))
+                                    match api::update_integration(&service, &key, config).await {
+                                        Ok(_) => {
+                                            status_msg.set("Configuration saved successfully.".into());
+                                            crate::app::show_toast("Configuration saved successfully", crate::app::ToastType::Success);
+                                        }
+                                        Err(e) => {
+                                            let err_msg = format!("Error: {}", e);
+                                            status_msg.set(err_msg.clone());
+                                            crate::app::show_toast(err_msg, crate::app::ToastType::Error);
+                                        }
                                     }
                                     is_loading.set(false);
                                 });

@@ -11,6 +11,7 @@ use crate::components::version_list::VersionList;
 use crate::components::view_edit::ViewEdit;
 use crate::components::view_gen_workflow::ViewGenWorkflow;
 use crate::components::visualize::Visualize;
+use crate::components::view_diff::ViewDiff;
 use crate::components::navbar::Navbar;
 
 #[derive(Routable, Clone, PartialEq, Debug)]
@@ -47,13 +48,123 @@ pub enum Route {
     ViewGenWorkflow { name: String, version: String },
     #[route("/workflow/:name/:version/edit")]
     ViewEdit { name: String, version: String },
+    #[route("/workflow/:name/:v1/diff/:v2")]
+    ViewDiff { name: String, v1: String, v2: String },
+}
+
+/// Toast notification state - shared across app
+#[derive(Clone)]
+pub struct ToastMessage {
+    pub id: u64,
+    pub message: String,
+    pub toast_type: ToastType,
+}
+
+#[derive(Clone, PartialEq)]
+pub enum ToastType {
+    Success,
+    Error,
+    Warning,
+    Info,
+}
+
+/// Global toast signal for app-wide notifications
+pub static TOASTS: GlobalSignal<Vec<ToastMessage>> = Global::new(|| Vec::new());
+
+/// Show a toast notification
+pub fn show_toast(message: impl Into<String>, toast_type: ToastType) {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let id = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_millis() as u64;
+    let toasts = TOASTS.cloned();
+    TOASTS.set([toasts, vec![ToastMessage { id, message: message.into(), toast_type }]].concat());
+}
+
+/// Remove a toast by id
+pub fn remove_toast(id: u64) {
+    let toasts = TOASTS.cloned();
+    TOASTS.set(toasts.into_iter().filter(|t| t.id != id).collect());
 }
 
 #[component]
 pub fn App() -> Element {
     rsx! {
         document::Link { rel: "stylesheet", href: asset!("/assets/main.css") }
+        crate::components::animated_bg::AnimatedBackground {}
         Router::<Route> {}
+        ToastContainer {}
+    }
+}
+
+/// Toast notification container
+#[component]
+fn ToastContainer() -> Element {
+    let toasts = TOASTS.read();
+
+    // Auto-dismiss toasts after 5 seconds
+    use_future(move || async move {
+        loop {
+            tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+            let toasts = TOASTS.cloned();
+            if !toasts.is_empty() {
+                // Remove the oldest toast
+                let oldest = toasts.iter().min_by_key(|t| t.id);
+                if let Some(oldest) = oldest {
+                    remove_toast(oldest.id);
+                }
+            }
+        }
+    });
+
+    rsx! {
+        div {
+            class: "toast-container",
+            aria_live: "polite",
+            aria_atomic: "true",
+            for toast in toasts.iter() {
+                Toast {
+                    key: "{toast.id}",
+                    id: toast.id,
+                    message: toast.message.clone(),
+                    toast_type: toast.toast_type.clone()
+                }
+            }
+        }
+    }
+}
+
+#[component]
+fn Toast(id: u64, message: String, toast_type: ToastType) -> Element {
+    let toast_class = match toast_type {
+        ToastType::Success => "toast toast-success",
+        ToastType::Error => "toast toast-error",
+        ToastType::Warning => "toast toast-warning",
+        ToastType::Info => "toast toast-info",
+    };
+
+    let icon = match toast_type {
+        ToastType::Success => "✓",
+        ToastType::Error => "✕",
+        ToastType::Warning => "⚠",
+        ToastType::Info => "ℹ",
+    };
+
+    rsx! {
+        div {
+            class: "{toast_class}",
+            role: "alert",
+            span { aria_hidden: "true", "{icon}" }
+            span { "{message}" }
+            button {
+                class: "btn btn-ghost",
+                style: "padding: 4px 8px; margin-left: auto; font-size: 14px;",
+                aria_label: "Close notification",
+                onclick: move |_| remove_toast(id),
+                "✕"
+            }
+        }
     }
 }
 
@@ -71,6 +182,8 @@ fn WorkspaceLayout() -> Element {
     let mut token = use_signal(crate::api::get_token);
     let mut user_email = use_signal(crate::api::get_user_email);
     let mut user_role = use_signal(crate::api::get_user_role);
+    let mut is_dark = use_signal(|| false);
+    let mut sidebar_open = use_signal(|| false);
     let nav = use_navigator();
 
     if token.read().is_none() {
@@ -90,14 +203,45 @@ fn WorkspaceLayout() -> Element {
     let can_run = is_admin || is_architect || is_operator;
 
     rsx! {
-        div { class: "app-container fade-in",
-            aside { class: "sidebar",
-                div { style: "margin-bottom: 48px; display: flex; align-items: center; gap: 12px;",
-                    img { 
-                        src: asset!("/assets/image.png"), 
-                        style: "width: 24px; height: 24px; object-fit: contain;" 
+        div {
+            class: "app-container fade-in",
+            "data-theme": if *is_dark.read() { "dark" } else { "light" },
+
+            // Skip to content link for accessibility
+            a {
+                class: "skip-to-content",
+                href: "#main-content",
+                "Skip to main content"
+            }
+
+            // Mobile menu overlay
+            if *sidebar_open.read() {
+                div {
+                    class: "modal-overlay",
+                    style: "display: none;",
+                    onclick: move |_| sidebar_open.set(false),
+                }
+            }
+
+            aside {
+                class: if *sidebar_open.read() { "sidebar open" } else { "sidebar" },
+                div { style: "margin-bottom: 48px; display: flex; align-items: center; justify-content: space-between;",
+                    div { style: "display: flex; align-items: center; gap: 12px;",
+                        img { 
+                            src: asset!("/assets/image.png"), 
+                            style: "width: 28px; height: 28px; object-fit: contain;" 
+                        }
+                        span { class: "brand-name", style: "font-size: 1.6rem; font-weight: 900; letter-spacing: -0.02em;", "RHEXIOM" }
                     }
-                    span { class: "brand-name", style: "font-size: 1.5rem; font-weight: 900; letter-spacing: -0.02em;", "RHEXIOM" }
+                    button { 
+                        class: "btn btn-ghost", 
+                        style: "padding: 6px; width: 32px; height: 32px; border-radius: 6px;",
+                        onclick: move |_| {
+                            let next = !*is_dark.read();
+                            is_dark.set(next);
+                        },
+                        if *is_dark.read() { "☼" } else { "☾" }
+                    }
                 }
 
                 nav { class: "nav-group",
@@ -116,31 +260,32 @@ fn WorkspaceLayout() -> Element {
                     Link { class: "nav-item", to: Route::Ledger {}, "Ledger" }
                 }
 
-                div { class: "nav-label", "Support" }
+                div { class: "nav-label", "Management" }
                 nav { class: "nav-group",
-                    Link { class: "nav-item", to: Route::Documentation {}, "Docs" }
+                    Link { class: "nav-item", to: Route::Integrations {}, "Integrations" }
                     Link { class: "nav-item", to: Route::Settings {}, "Settings" }
                 }
 
-                if is_admin {
-                    div { class: "nav-label", style: "margin-top: 24px;", "Administration" }
-                    nav { class: "nav-group",
-                        Link { class: "nav-item", to: Route::Integrations {}, "Integrations" }
-                    }
+                div { class: "nav-label", "Support" }
+                nav { class: "nav-group",
+                    Link { class: "nav-item", to: Route::Documentation {}, "Docs" }
                 }
 
                 if let Some(email) = user_email.read().as_ref() {
                     div { style: "margin-top: auto; padding-top: 24px; border-top: 1px solid var(--border);",
                         div { style: "display: flex; align-items: center; gap: 12px; margin-bottom: 16px;",
                             div { 
-                                style: "width: 24px; height: 24px; background: var(--text-primary); border-radius: 4px; color: white; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700;",
+                                style: "width: 32px; height: 32px; background: var(--accent-primary); border-radius: 8px; color: black; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 800;",
                                 "{email.chars().next().unwrap_or('U')}"
                             }
-                            span { style: "font-size: 13px; font-weight: 600; color: var(--text-secondary);", "{email}" }
+                            div {
+                                div { style: "font-size: 13px; font-weight: 700; color: var(--text-primary);", "{email}" }
+                                div { style: "font-size: 11px; font-weight: 600; color: var(--accent-primary);", "{role.clone().unwrap_or_default().to_uppercase()}" }
+                            }
                         }
                         button { 
-                            class: "btn", 
-                            style: "width: 100%; border: 1px solid var(--border); font-size: 12px; font-weight: 700; text-transform: uppercase;",
+                            class: "btn btn-danger", 
+                            style: "width: 100%; border-radius: 8px; font-size: 12px; font-weight: 700;",
                             onclick: move |_| {
                                 crate::api::logout();
                                 token.set(None);
@@ -154,12 +299,32 @@ fn WorkspaceLayout() -> Element {
                 }
             }
 
-            main { class: "main-content",
-                header { class: "app-header",
+            main {
+                class: "main-content",
+                id: "main-content",
+                header {
+                    class: "app-header",
+                    // Mobile menu toggle button
+                    button {
+                        class: "btn btn-ghost mobile-menu-toggle",
+                        style: "display: none; margin-right: 12px;",
+                        aria_label: "Toggle navigation menu",
+                        aria_expanded: "{sidebar_open}",
+                        onclick: move |_| sidebar_open.set(!*sidebar_open),
+                        "☰"
+                    }
                     div { class: "breadcrumb",
                         span { "RHEXIOM" }
-                        span { class: "breadcrumb-sep", "/" }
-                        span { class: "breadcrumb-current", "WORKSPACE" }
+                        span { class: "breadcrumb-sep", "→" }
+                        span { class: "breadcrumb-current", "SECURE_WORKSPACE" }
+                    }
+                    div { style: "display: flex; gap: 16px;",
+                        div {
+                            class: "badge badge-success",
+                            role: "status",
+                            aria_live: "polite",
+                            "System Operational"
+                        }
                     }
                 }
 
@@ -186,25 +351,47 @@ fn Dashboard() -> Element {
         div { class: "fade-in",
             h1 { class: "page-title", "CONSOLE" }
             
-            div { style: "display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; margin-bottom: 48px;",
-                div { class: "card",
-                    div { class: "section-title", style: "margin-top: 0;", "STATUS" }
-                    div { style: "font-size: 2.5rem; font-family: var(--font-display); color: var(--accent-primary);", "{system_status}" }
+            div { class: "grid-4", style: "margin-bottom: 48px;",
+                div { class: "card stat-card",
+                    div { class: "stat-label", "System Health" }
+                    div { class: "stat-value", style: "color: var(--status-success);", "{system_status}" }
                 }
-                div { class: "card",
-                    div { class: "section-title", style: "margin-top: 0;", "ACTIVE POLICIES" }
-                    div { style: "font-size: 2.5rem; font-family: var(--font-display);", "{active_workflows}" }
+                div { class: "card stat-card",
+                    div { class: "stat-label", "Active Policies" }
+                    div { class: "stat-value", "{active_workflows}" }
                 }
-                div { class: "card",
-                    div { class: "section-title", style: "margin-top: 0;", "EXECUTIONS" }
-                    div { style: "font-size: 2.5rem; font-family: var(--font-display);", "{total_executions}" }
+                div { class: "card stat-card",
+                    div { class: "stat-label", "Total Runs" }
+                    div { class: "stat-value", "{total_executions}" }
+                }
+                div { class: "card stat-card",
+                    div { class: "stat-label", "Risk Index" }
+                    div { class: "stat-value", "0.02" }
                 }
             }
 
-            div { class: "section-title", "LIVE STREAM" }
-            div { class: "card", style: "padding: 0; overflow: hidden;",
-                crate::components::activity_list::ActivityList { 
-                    on_select: move |id| { nav.push(Route::ExecutionDetail { id }); } 
+            div { style: "display: grid; grid-template-columns: 1fr 340px; gap: 32px;",
+                div {
+                    div { class: "section-title", style: "margin-top: 0;", "LIVE EXECUTION STREAM" }
+                    div { class: "card", style: "padding: 0; overflow: hidden;",
+                        crate::components::activity_list::ActivityList { 
+                            on_select: move |id| { nav.push(Route::ExecutionDetail { id }); } 
+                        }
+                    }
+                }
+                
+                aside {
+                    div { class: "section-title", style: "margin-top: 0;", "SYSTEM ALERTS" }
+                    div { style: "display: flex; flex-direction: column; gap: 16px;",
+                        div { class: "card", style: "padding: 16px; border-left: 4px solid var(--status-warning);",
+                            div { style: "font-weight: 700; font-size: 13px; margin-bottom: 4px;", "Rate Limit Warning" }
+                            p { style: "font-size: 12px; color: var(--text-faint); margin: 0;", "HubSpot API is approaching 80% capacity." }
+                        }
+                        div { class: "card", style: "padding: 16px; border-left: 4px solid var(--status-info);",
+                            div { style: "font-weight: 700; font-size: 13px; margin-bottom: 4px;", "Policy Update" }
+                            p { style: "font-size: 12px; color: var(--text-faint); margin: 0;", "Global 'ExpenseGate' v2.1 deployed." }
+                        }
+                    }
                 }
             }
         }
@@ -230,6 +417,11 @@ fn Ledger() -> Element {
 }
 
 #[component]
+fn ViewDiffPage(name: String, v1: String, v2: String) -> Element {
+    rsx! { crate::components::view_diff::ViewDiff { name, v1, v2 } }
+}
+
+#[component]
 fn About() -> Element {
     rsx! { AboutPage {} }
 }
@@ -239,6 +431,43 @@ fn Settings() -> Element {
     let email = crate::api::get_user_email();
     let role = crate::api::get_user_role();
     rsx! { SettingsPage { user_email: email, user_role: role } }
+}
+
+#[component]
+fn SettingsPage(user_email: Option<String>, user_role: Option<String>) -> Element {
+    rsx! {
+        div { class: "fade-in",
+            h1 { class: "page-title", "SETTINGS" }
+            
+            div { class: "section-title", "PROFILE" }
+            div { class: "card",
+                div { style: "display: flex; flex-direction: column; gap: 24px;",
+                    div {
+                        label { class: "form-label", "Email Address" }
+                        div { style: "font-size: 1.1rem; font-weight: 600;", "{user_email.clone().unwrap_or_else(|| \"Not signed in\".into())}" }
+                    }
+                    div {
+                        label { class: "form-label", "Assigned Role" }
+                        div { style: "font-size: 1.1rem; font-weight: 600;", "{user_role.clone().unwrap_or_else(|| \"N/A\".into())}" }
+                    }
+                }
+            }
+
+            div { class: "section-title", "SECURITY" }
+            crate::components::mfa_setup::MfaSetup {}
+
+            div { class: "section-title", "PREFERENCES" }
+            div { class: "card",
+                div { style: "display: flex; align-items: center; justify-content: space-between;",
+                    div {
+                        div { style: "font-weight: 700; font-size: 1.1rem;", "High-Precision Mode" }
+                        div { style: "font-size: 13px; color: var(--text-faint);", "Enable forensic tracing by default for all executions." }
+                    }
+                    button { class: "btn", "Enabled" }
+                }
+            }
+        }
+    }
 }
 
 #[component]
@@ -292,36 +521,4 @@ fn AboutPage() -> Element {
     }
 }
 
-#[component]
-fn SettingsPage(user_email: Option<String>, user_role: Option<String>) -> Element {
-    rsx! {
-        div { class: "fade-in",
-            h1 { class: "page-title", "SETTINGS" }
-            
-            div { class: "section-title", "PROFILE" }
-            div { class: "card",
-                div { style: "display: flex; flex-direction: column; gap: 24px;",
-                    div {
-                        label { class: "form-label", "Email Address" }
-                        div { style: "font-size: 1.1rem; font-weight: 600;", "{user_email.clone().unwrap_or_else(|| \"Not signed in\".into())}" }
-                    }
-                    div {
-                        label { class: "form-label", "Assigned Role" }
-                        div { style: "font-size: 1.1rem; font-weight: 600;", "{user_role.clone().unwrap_or_else(|| \"N/A\".into())}" }
-                    }
-                }
-            }
 
-            div { class: "section-title", "PREFERENCES" }
-            div { class: "card",
-                div { style: "display: flex; align-items: center; justify-content: space-between;",
-                    div {
-                        div { style: "font-weight: 700; font-size: 1.1rem;", "High-Precision Mode" }
-                        div { style: "font-size: 13px; color: var(--text-faint);", "Enable forensic tracing by default for all executions." }
-                    }
-                    button { class: "btn", "Enabled" }
-                }
-            }
-        }
-    }
-}

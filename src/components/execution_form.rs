@@ -229,9 +229,10 @@ pub fn ExecutionForm() -> Element {
 
                                     match crate::api::run_workflow(&request).await {
                                         Ok(response) => {
-                                            let total_duration_us = response.trace.last().map(|s| s.timestamp_us).unwrap_or(0);
+                                            let total_duration_us = response.trace.total_duration_us;
                                             let steps = response
                                                 .trace
+                                                .steps
                                                 .into_iter()
                                                 .map(|step| (step.step_name, step.action, step.timestamp_us))
                                                 .collect();
@@ -241,6 +242,7 @@ pub fn ExecutionForm() -> Element {
                                                 final_step: response.final_step,
                                                 total_duration_us,
                                                 steps,
+                                                actions: response.actions,
                                             }));
                                         }
                                         Err(err) => {
@@ -249,6 +251,7 @@ pub fn ExecutionForm() -> Element {
                                                 final_step: "Network error".to_string(),
                                                 total_duration_us: 0,
                                                 steps: vec![("Error".to_string(), Some(err), 0)],
+                                                actions: Vec::new(),
                                             }));
                                         }
                                     }
@@ -285,6 +288,20 @@ pub fn ExecutionForm() -> Element {
                             style: "margin-top: 32px; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center;",
                             span { class: "label-caps", style: "margin: 0; font-size: 10px;", "Final decision" }
                             span { class: "brand-name", style: "color: var(--text-primary); font-size: 13px;", "{result.final_step}" }
+                        }
+
+                        // Actions display
+                        if !result.actions.is_empty() {
+                            div { 
+                                class: "industrial-card",
+                                style: "margin-top: 16px; padding: 12px 16px;",
+                                div { class: "label-caps", style: "margin-bottom: 8px; font-size: 10px;", "Actions Taken" }
+                                div { style: "display: flex; flex-direction: column; gap: 4px;",
+                                    for action in result.actions.iter() {
+                                        div { style: "font-size: 12px; color: var(--text-secondary); font-family: monospace;", "{action}" }
+                                    }
+                                }
+                            }
                         }
                         
                         div { class: "trace-timeline", style: "margin-top: 32px; display: flex; flex-direction: column; gap: 12px;",
@@ -323,4 +340,5 @@ struct ExecutionResultData {
     final_step: String,
     total_duration_us: u64,
     steps: Vec<(String, Option<String>, u64)>,
+    actions: Vec<String>,
 }
