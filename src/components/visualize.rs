@@ -41,29 +41,27 @@ pub fn Visualize() -> Element {
     });
 
     rsx! {
-        div { class: "page-stack",
-            section { class: "card",
-                div { class: "card-header",
-                    div {
-                        div { class: "card-title", "Selection" }
-                        div { class: "card-description", "Choose a workflow and version to visualize the logic." }
-                    }
-                }
+        div { class: "fade-in",
+            h1 { class: "page-title", "DIAGNOSTIC VISUALIZER" }
+            p { style: "font-size: 1.1rem; color: var(--text-secondary); margin-bottom: 40px;",
+                "Interactive trace of policy logic compiled into deterministic execution graphs."
+            }
 
-                div { class: "grid-2",
+            section { class: "card", style: "margin-bottom: 32px;",
+                div { class: "section-title", style: "margin-top: 0;", "SELECTION" }
+                
+                div { style: "display: grid; grid-template-columns: 1fr 1fr; gap: 24px;",
                     div { class: "form-group",
-                        label { class: "form-label", "Workflow" }
+                        label { class: "form-label", "TARGET WORKFLOW" }
                         select {
-                            class: "form-input",
                             onchange: move |evt| {
                                 let val = evt.value();
                                 selected_workflow.set(Some(val.clone()));
-                                // Reset version when workflow changes
                                 if let Some(w) = workflows.read().iter().find(|w| w.name == val) {
                                     selected_version.set(w.versions.first().cloned());
                                 }
                             },
-                            option { value: "", "Select a workflow..." }
+                            option { value: "", "Choose workflow..." }
                             for w in workflows.read().iter() {
                                 option { value: "{w.name}", "{w.name}" }
                             }
@@ -72,9 +70,8 @@ pub fn Visualize() -> Element {
 
                     if let Some(w_name) = selected_workflow.read().as_ref() {
                         div { class: "form-group",
-                            label { class: "form-label", "Version" }
+                            label { class: "form-label", "ARTIFACT VERSION" }
                             select {
-                                class: "form-input",
                                 value: selected_version.read().clone().unwrap_or_default(),
                                 onchange: move |evt| selected_version.set(Some(evt.value())),
                                 for v in workflows.read().iter().find(|w| &w.name == w_name).map(|w| &w.versions).unwrap_or(&vec![]) {
@@ -87,27 +84,25 @@ pub fn Visualize() -> Element {
             }
 
             if *loading.read() {
-                div { class: "status-message", "Fetching workflow graph symbols..." }
+                div { style: "padding: 40px; text-align: center; color: var(--text-faint);", "Synthesizing graph symbols..." }
             } else if let Some(err) = error.read().as_ref() {
-                div { class: "status-message status-message-error", "{err}" }
+                div { class: "status-pill status-pill-danger", style: "display: block; width: fit-content; margin: 0 auto;", "{err}" }
             } else if let Some(detail) = workflow_detail.read().as_ref() {
                 if let Some(ast_str) = detail.get("ast_json").and_then(|v| v.as_str()) {
                     if let Ok(ast) = serde_json::from_str::<serde_json::Value>(ast_str) {
-                        section { class: "card graph-card",
-                            div { class: "card-header",
-                                div {
-                                    div { class: "card-title", "Process Logic" }
-                                    div { class: "card-description", "Interactive trace of the compiled policy logic." }
-                                }
+                        section { class: "card", style: "padding: 0; overflow: hidden; background: #fff; min-height: 500px;",
+                            div { style: "padding: 24px; border-bottom: 1px solid var(--border); background: var(--bg); display: flex; justify-content: space-between; align-items: center;",
+                                h3 { style: "margin: 0; font-size: 1.25rem;", "LOGIC TOPOLOGY" }
+                                span { class: "status-pill", "Deterministic View" }
                             }
                             WorkflowGraph { injected_ast: ast }
                         }
                     }
                 }
             } else {
-                div { class: "empty-state",
-                    div { class: "empty-state-icon", "✧" }
-                    div { class: "empty-state-text", "Select a workflow to begin visualization" }
+                div { style: "height: 300px; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 1px dashed var(--border-strong); border-radius: 12px; color: var(--text-faint);",
+                    span { style: "font-size: 2rem; margin-bottom: 12px;", "✧" }
+                    div { "Select an artifact to begin visualization" }
                 }
             }
         }

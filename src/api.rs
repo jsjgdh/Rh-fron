@@ -170,6 +170,29 @@ pub fn set_user_email(email: &str) {
     }
 }
 
+pub fn get_user_role() -> Option<String> {
+    #[cfg(target_arch = "wasm32")]
+    {
+        if let Some(window) = web_sys::window() {
+            if let Ok(Some(storage)) = window.local_storage() {
+                return storage.get_item("rhexiom_role").ok().flatten();
+            }
+        }
+    }
+    None
+}
+
+pub fn set_user_role(role: &str) {
+    #[cfg(target_arch = "wasm32")]
+    {
+        if let Some(window) = web_sys::window() {
+            if let Ok(Some(storage)) = window.local_storage() {
+                let _ = storage.set_item("rhexiom_role", role);
+            }
+        }
+    }
+}
+
 pub fn logout() {
     #[cfg(target_arch = "wasm32")]
     {
@@ -177,6 +200,7 @@ pub fn logout() {
             if let Ok(Some(storage)) = window.local_storage() {
                 let _ = storage.remove_item("rhexiom_token");
                 let _ = storage.remove_item("rhexiom_email");
+                let _ = storage.remove_item("rhexiom_role");
             }
         }
     }
@@ -378,6 +402,22 @@ pub async fn get_execution_detail(execution_id: &str) -> Result<serde_json::Valu
     }
 }
 
+/// Run a what-if simulation for an execution.
+pub async fn simulate_execution(execution_id: &str) -> Result<serde_json::Value, String> {
+    let res = authorized_request(reqwest::Method::POST, format!("{}/executions/{}/simulate", &*API_BASE, execution_id))
+        .send()
+        .await
+        .map_err(|e| format!("Network connection failed: {}", e))?;
+
+    if res.status().is_success() {
+        res.json::<serde_json::Value>()
+            .await
+            .map_err(|e| format!("Failed to parse simulation result: {}", e))
+    } else {
+        Err(format!("Simulation failed with status: {}", res.status()))
+    }
+}
+
 /// List available integration services.
 pub async fn get_integrations() -> Result<Vec<String>, String> {
     let res = authorized_request(reqwest::Method::GET, format!("{}/integrations", &*API_BASE))
@@ -472,6 +512,7 @@ pub struct LoginRequest {
 pub struct SignupRequest {
     pub email: String,
     pub password: String,
+    pub role: Option<String>,
 }
 
 /// Response containing the auth token and user profile.
@@ -481,6 +522,7 @@ pub struct AuthResponse {
     pub token: Option<String>,
     pub user_id: Option<String>,
     pub email: Option<String>,
+    pub role: Option<String>,
     pub error: Option<String>,
 }
 

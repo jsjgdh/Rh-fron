@@ -3,17 +3,10 @@ use serde_json::Value;
 use crate::api::{get_execution_detail, get_workflow_detail};
 use crate::components::workflow_graph::WorkflowGraph;
 
-#[derive(Props, PartialEq, Clone)]
-pub struct ExecutionDetailProps {
-    pub execution_id: String,
-}
-
 #[component]
-pub fn ExecutionDetail(props: ExecutionDetailProps) -> Element {
-    let execution_id = props.execution_id.clone();
-    
+pub fn ExecutionDetail(id: String) -> Element {
     let execution = use_resource({
-        let id = execution_id.clone();
+        let id = id.clone();
         move || {
             let id = id.clone();
             async move { get_execution_detail(&id).await }
@@ -59,10 +52,23 @@ pub fn ExecutionDetail(props: ExecutionDetailProps) -> Element {
                     div { class: "card-header",
                         div {
                             div { class: "app-eyebrow", "Forensic Audit Trail" }
-                            h2 { class: "section-title", "Trace {execution_id}" }
+                            h2 { class: "section-title", "Trace {id}" }
                             p { class: "section-copy", "Verified execution of {wf_name} recorded on {created_at}." }
                         }
-                        span { class: "badge badge-{status_lower}", "{status}" }
+                        div { style: "display: flex; align-items: center; gap: 12px;",
+                            button { 
+                                class: "btn btn-secondary", 
+                                style: "background: var(--bg); border: 1px solid var(--accent); color: var(--accent);",
+                                onclick: move |_| {
+                                    let id = id.clone();
+                                    spawn(async move {
+                                        let _ = crate::api::simulate_execution(&id).await;
+                                    });
+                                },
+                                "Simulate what-if branch"
+                            }
+                            span { class: "badge badge-{status_lower}", "{status}" }
+                        }
                     }
                 }
 

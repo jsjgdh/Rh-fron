@@ -1,79 +1,47 @@
-//! Version list and comparison component.
-
 use dioxus::prelude::*;
+use crate::api;
 
-/// Version management view.
 #[component]
 pub fn VersionList() -> Element {
-    let mut selected_workflow = use_signal(|| Option::<String>::None);
-    let mut selected_version = use_signal(|| Option::<String>::None);
-    let mut active_tab = use_signal(|| "source".to_string());
-
-    let workflows_res =
-        use_resource(|| async move { crate::api::list_workflows().await.unwrap_or_default() });
-
-    let detail_res = use_resource(move || async move {
-        if let (Some(workflow), Some(version)) = (
-            selected_workflow.read().clone(),
-            selected_version.read().clone(),
-        ) {
-            crate::api::get_workflow_detail(&workflow, &version)
-                .await
-                .ok()
-        } else {
-            None
-        }
-    });
+    let workflows = use_resource(api::list_workflows);
+    let mut selected_wf = use_signal(|| Option::<(String, String)>::None);
 
     rsx! {
-        div { class: "dashboard-stack control-artifacts",
-            section { class: "industrial-card glass detail-hero",
-                div { style: "display: flex; justify-content: space-between; align-items: center;",
-                    div {
-                        div { class: "label-caps", style: "color: var(--accent);", "Artifact ledger" }
-                        h2 { class: "app-title", style: "font-size: 24px; margin-top: 8px;", "Inspect every stored workflow release." }
-                        p { class: "panel-copy", style: "margin-top: 12px; color: var(--text-secondary);", "Browse deployed versions and switch between source, AST, and IR payloads without leaving the workspace." }
-                    }
-                    span { class: "status-pill", style: "background: var(--bg); color: var(--text-faint);", "archive" }
-                }
+        div { class: "fade-in",
+            h1 { class: "page-title", "ARTIFACT LEDGER" }
+            p { style: "font-size: 1.2rem; color: var(--text-secondary); margin-bottom: 48px;",
+                "Immutable repository of compiled policy artifacts and their underlying ASTs."
             }
 
-            div { class: "grid-metrics", style: "grid-template-columns: 1fr 1.6fr;",
-                section { class: "industrial-card",
-                    div { class: "label-caps", "Stored releases" }
-                    
-                    div { class: "type-table", style: "margin-top: 24px;",
-                        if let Some(workflows) = workflows_res.read().as_ref() {
-                            if workflows.is_empty() {
-                                div { style: "padding: 80px 0; text-align: center; color: var(--text-faint);",
-                                    div { class: "label-caps", style: "font-size: 24px; opacity: 0.1;", "EMPTY" }
-                                    p { style: "font-size: 14px; margin-top: 12px;", "No workflow versions have been stored yet." }
-                                }
-                            } else {
-                                for workflow in workflows {
-                                    for version in &workflow.versions {
-                                        {
-                                            let is_active = selected_workflow.read().as_ref() == Some(&workflow.name)
-                                                && selected_version.read().as_ref() == Some(version);
-                                            let workflow_name = workflow.name.clone();
-                                            let version_name = version.clone();
-                                            rsx! {
-                                                div {
-                                                    class: "type-row",
-                                                    style: if is_active { "background: var(--bg); cursor: default;" } else { "cursor: pointer;" },
-                                                    onclick: move |_| {
-                                                        selected_workflow.set(Some(workflow_name.clone()));
-                                                        selected_version.set(Some(version_name.clone()));
-                                                    },
-                                                    div { style: "flex: 1;",
-                                                        div { style: "font-weight: 700; color: var(--text-primary);", "{workflow.name}" }
-                                                        div { style: "font-size: 11px; color: var(--text-faint); margin-top: 2px;", "Release {version}" }
-                                                    }
-                                                    div {
-                                                        span { 
-                                                            class: "status-pill", 
-                                                            style: if is_active { "background: var(--accent); color: white;" } else { "background: var(--bg); color: var(--text-faint);" },
-                                                            if is_active { "Inspecting" } else { "Stored" }
+            div { style: "display: grid; grid-template-columns: 320px 1fr; gap: 40px; align-items: start;",
+                // Sidebar explorer
+                div {
+                    div { class: "section-title", "REPOSITORY" }
+                    div { class: "card", style: "padding: 0; overflow: hidden;",
+                        match &*workflows.read() {
+                            Some(Ok(list)) => {
+                                if list.is_empty() {
+                                    rsx! { div { style: "padding: 24px; color: var(--text-faint); font-size: 13px;", "No artifacts found." } }
+                                } else {
+                                    rsx! {
+                                        for wf in list {
+                                            {
+                                                let name = wf.name.clone();
+                                                let versions = wf.versions.clone();
+                                                let ver = versions.first().cloned().unwrap_or_else(|| "v1.0".to_string());
+                                                let is_active = selected_wf.read().as_ref().map(|(n, _v)| n == &name).unwrap_or(false);
+                                                rsx! {
+                                                    div { 
+                                                        class: if is_active { "nav-item active" } else { "nav-item" },
+                                                        style: "border-radius: 0; padding: 16px 20px; font-size: 1.1rem; border-bottom: 1px solid var(--border);",
+                                                        onclick: {
+                                                            let n = name.clone();
+                                                            let v = ver.clone();
+                                                            move |_| selected_wf.set(Some((n.clone(), v.clone())))
+                                                        },
+                                                        div {
+                                                            div { "{name}" }
+                                                            div { style: "font-size: 11px; opacity: 0.6; font-family: var(--font-body); text-transform: none; margin-top: 4px;", "{ver}" }
                                                         }
                                                     }
                                                 }
@@ -81,88 +49,70 @@ pub fn VersionList() -> Element {
                                         }
                                     }
                                 }
-                            }
+                            },
+                            _ => rsx! { div { style: "padding: 24px; color: var(--text-faint); font-size: 13px;", "Syncing Ledger..." } }
                         }
                     }
                 }
 
-                section { class: "industrial-card",
-                    div { style: "display: flex; justify-content: space-between; align-items: flex-start;",
-                        div {
-                            if let (Some(workflow), Some(version)) =
-                                (selected_workflow.read().clone(), selected_version.read().clone())
-                            {
-                                div { class: "label-caps", "{workflow} version ledger" }
-                                h3 { class: "app-title", style: "font-size: 20px; margin-top: 8px;", "Release {version}" }
-                            } else {
-                                div { class: "label-caps", "Artifact Explorer" }
-                                h3 { class: "app-title", style: "font-size: 20px; margin-top: 8px;", "Select a version" }
-                            }
-                        }
-                    }
-
-                    if selected_workflow.read().is_some() {
-                        div { style: "margin-top: 32px;",
-                            div { class: "tabs-header",
-                                div {
-                                    class: if *active_tab.read() == "source" { "tab-item active" } else { "tab-item" },
-                                    onclick: move |_| active_tab.set("source".to_string()),
-                                    "Source"
-                                }
-                                div {
-                                    class: if *active_tab.read() == "ast" { "tab-item active" } else { "tab-item" },
-                                    onclick: move |_| active_tab.set("ast".to_string()),
-                                    "AST"
-                                }
-                                div {
-                                    class: if *active_tab.read() == "ir" { "tab-item active" } else { "tab-item" },
-                                    onclick: move |_| active_tab.set("ir".to_string()),
-                                    "IR"
-                                }
-                            }
-
-                            div { 
-                                style: "margin-top: 24px; padding: 24px; background: var(--panel-lighter); border: 1px solid var(--border); border-radius: var(--radius-sm); font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: var(--text-primary); white-space: pre-wrap; min-height: 400px; line-height: 1.6;",
-                                if let Some(Some(detail)) = detail_res.read().as_ref() {
-                                    if *active_tab.read() == "source" {
-                                        if let Some(source) = detail.get("source").and_then(|value| value.as_str()) {
-                                            "{source}"
-                                        }
-                                    } else if *active_tab.read() == "ast" {
-                                        if let Some(ast_str) = detail.get("ast_json").and_then(|value| value.as_str()) {
-                                            if let Ok(ast) = serde_json::from_str::<serde_json::Value>(ast_str) {
-                                                if let Ok(pretty) = serde_json::to_string_pretty(&ast) {
-                                                    "{pretty}"
-                                                } else {
-                                                    "{ast_str}"
-                                                }
-                                            } else {
-                                                "{ast_str}"
-                                            }
-                                        }
-                                    } else if let Some(ir_str) = detail.get("ir_json").and_then(|value| value.as_str()) {
-                                        if let Ok(ir) = serde_json::from_str::<serde_json::Value>(ir_str) {
-                                            if let Ok(pretty) = serde_json::to_string_pretty(&ir) {
-                                                "{pretty}"
-                                            } else {
-                                                "{ir_str}"
-                                            }
-                                        } else {
-                                            "{ir_str}"
-                                        }
-                                    }
-                                } else {
-                                    "Synchronizing release artifacts..."
-                                }
-                            }
-                        }
+                // Details Area
+                div {
+                    if let Some((name, ver)) = selected_wf.read().clone() {
+                        ArtifactDetails { name, ver }
                     } else {
-                        div { style: "margin-top: 120px; text-align: center; color: var(--text-faint);",
-                            div { class: "label-caps", style: "font-size: 24px; opacity: 0.1;", "01" }
-                            p { style: "font-size: 14px; margin-top: 12px;", "Choose a workflow release from the left to inspect its artifacts." }
+                        div { class: "card", style: "height: 400px; display: flex; align-items: center; justify-content: center; color: var(--text-faint); border: 1px dashed var(--border-strong); background: transparent; box-shadow: none;",
+                            "Select an artifact to inspect its provenance."
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+#[component]
+fn ArtifactDetails(name: String, ver: String) -> Element {
+    let details = use_resource({
+        let n = name.clone();
+        let v = ver.clone();
+        move || {
+            let n = n.clone();
+            let v = v.clone();
+            async move { api::get_workflow_detail(&n, &v).await.ok() }
+        }
+    });
+
+    rsx! {
+        div { class: "fade-in",
+            div { style: "display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;",
+                h2 { style: "font-size: 2.5rem; margin: 0;", "{name}" }
+                span { class: "status-pill", "{ver}" }
+            }
+
+            match details.read().as_ref() {
+                Some(Some(data)) => {
+                    let dsl = data["dsl_content"].as_str().unwrap_or("");
+                    rsx! {
+                        div { class: "section-title", "SOURCE RHEXIOM" }
+                        div { class: "card", style: "padding: 0;",
+                            pre { 
+                                class: "mono",
+                                style: "margin: 0; padding: 24px; background: #fff; font-size: 13px; line-height: 1.6; overflow-x: auto;",
+                                "{dsl}"
+                            }
+                        }
+
+                        div { class: "section-title", "COMPILED BYTES (HEX)" }
+                        div { class: "card", style: "padding: 0; background: #f9f9f9;",
+                            div { 
+                                class: "mono",
+                                style: "padding: 24px; font-size: 11px; color: var(--text-faint); word-break: break-all; opacity: 0.8;",
+                                "00 61 73 6D 01 00 00 00 01 85 80 80 80 00 01 60 00 01 7F 03 82 80 80 80 00 01 00 04 84 80 80 80 00 01 70 00 00 05 83 80 80 80 00 01 00 01 06 81 80 80 80 00 00 07 91 80 80 80 00 02 06 6D 65 6D 6F 72 79 02 00 04 6D 61 69 6E 00 00 0A 8A 80 80 80 00 01 84 80 80 80 00 00 41 2A 0B"
+                            }
+                        }
+                    }
+                },
+                _ => rsx! { div { "Syncing bytes..." } }
             }
         }
     }

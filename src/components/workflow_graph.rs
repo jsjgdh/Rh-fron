@@ -129,88 +129,175 @@ pub fn WorkflowGraph(props: WorkflowGraphProps) -> Element {
         }
     }
 
+    // 2. Compute viewBox to fit graph
+    let (max_x, max_y) = nodes.iter().fold((0.0_f64, 0.0_f64), |(mx, my), n| {
+        (mx.max(n.x + NODE_WIDTH + 120.0), my.max(n.y + NODE_HEIGHT + 160.0))
+    });
+    let vb_w = max_x.max(1200.0);
+    let vb_h = max_y.max(720.0);
+
+    let selected = selected_node.read().clone();
+    let selected_details = selected.as_ref().and_then(|name| nodes.iter().find(|n| &n.name == name).cloned());
+
     rsx! {
-        div { class: "vg-canvas-svg",
-            svg { 
-                view_box: "0 0 2000 1200", 
-                width: "100%", 
-                height: "100%",
-                
-                // 1. Draw Forensic Connections (Bezier Paths)
-                for conn in connections {
-                    {
-                        let path_data = if conn.from_y == conn.to_y {
-                            // Horizontal smooth line
-                            format!("M {} {} L {} {}", conn.from_x, conn.from_y, conn.to_x, conn.to_y)
-                        } else {
-                            // Curved Bezier for branching
-                            format!("M {} {} C {} {}, {} {}, {} {}", 
+        div { class: "vg-shell",
+            div { class: "vg-toolbar",
+                div { class: "label-caps", "visual flow" }
+                div { class: "vg-legend",
+                    span { class: "vg-legend-item", span { class: "vg-swatch vg-swatch-active" } "active" }
+                    span { class: "vg-legend-item", span { class: "vg-swatch vg-swatch-decision" } "decision" }
+                    span { class: "vg-legend-item", span { class: "vg-swatch vg-swatch-selected" } "selected" }
+                }
+            }
+
+            div { class: "vg-canvas",
+                svg {
+                    view_box: "0 0 {vb_w} {vb_h}",
+                    width: "100%",
+                    height: "100%",
+
+                    defs {
+                        marker {
+                            id: "vg-arrow",
+                            view_box: "0 0 10 10",
+                            ref_x: "9",
+                            ref_y: "5",
+                            marker_width: "8",
+                            marker_height: "8",
+                            orient: "auto-start-reverse",
+                            path { d: "M 0 0 L 10 5 L 0 10 z", class: "forensic-arrow" }
+                        }
+                    }
+
+                    // 1. Draw Forensic Connections (Bezier Paths + arrows)
+                    for conn in connections {
+                        {
+                            let (c1x, c1y, c2x, c2y) = if (conn.from_y - conn.to_y).abs() < 0.01 {
+                                let dx = ((conn.to_x - conn.from_x).abs() * 0.55).min(140.0).max(60.0);
+                                (conn.from_x + dx, conn.from_y, conn.to_x - dx, conn.to_y)
+                            } else {
+                                let dy = ((conn.to_y - conn.from_y).abs() * 0.55).min(140.0).max(60.0);
+                                (conn.from_x, conn.from_y + dy, conn.to_x, conn.to_y - dy)
+                            };
+
+                            let path_data = format!(
+                                "M {} {} C {} {}, {} {}, {} {}",
                                 conn.from_x, conn.from_y,
-                                conn.from_x, conn.to_y,
-                                conn.from_x, conn.to_y,
+                                c1x, c1y,
+                                c2x, c2y,
                                 conn.to_x, conn.to_y
-                            )
-                        };
-                        rsx! {
-                            g {
-                                path {
-                                    class: if conn.is_active { "forensic-path active" } else { "forensic-path" },
-                                    d: "{path_data}"
-                                }
-                                if let Some(lbl) = &conn.label {
-                                    text {
-                                        x: (conn.from_x + 10.0),
-                                        y: (conn.from_y + (conn.to_y - conn.from_y)/2.0 + 5.0),
-                                        fill: "#94a3b8",
-                                        font_size: "10",
-                                        font_weight: "bold",
-                                        "{lbl}"
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
+                            );
 
-                // 2. Draw Nodes
-                for node in nodes {
-                    {
-                        let is_sel = *selected_node.read() == Some(node.name.clone());
-                        let is_active = active_steps.contains(&node.name);
-                        let icon = get_icon(&node.action);
-                        
-                        rsx! {
-                            g { 
-                                class: "forensic-node",
-                                onclick: {
-                                    let name = node.name.clone();
-                                    move |_| selected_node.set(Some(name.clone()))
-                                },
-                                
-                                foreignObject { 
-                                    x: node.x, 
-                                    y: node.y, 
-                                    width: NODE_WIDTH, 
-                                    height: NODE_HEIGHT+40.0,
-                                    
-                                    div { class: if is_sel { "node-card selected" } else { "node-card" },
-                                        div { class: "vg-action-header",
-                                            div { class: "vg-action-icon", "{icon}" }
-                                            div { class: "vg-action-title", "{node.name}" }
-                                        }
-                                        if !node.action.is_empty() {
-                                            div { class: "vg-action-type", "{node.action}" }
+                            let label_x = (conn.from_x + conn.to_x) * 0.5;
+                            let label_y = (conn.from_y + conn.to_y) * 0.5 - 8.0;
+
+                            rsx! {
+                                g {
+                                    path {
+                                        class: if conn.is_active { "forensic-path active" } else { "forensic-path" },
+                                        d: "{path_data}",
+                                        marker_end: "url(#vg-arrow)"
+                                    }
+                                    if let Some(lbl) = &conn.label {
+                                        text {
+                                            x: "{label_x}",
+                                            y: "{label_y}",
+                                            class: "vg-edge-label",
+                                            "{lbl}"
                                         }
                                     }
                                 }
                             }
                         }
                     }
+
+                    // 2. Draw Nodes
+                    for node in nodes {
+                        {
+                            let is_sel = selected.as_ref() == Some(&node.name);
+                            let is_active = active_steps.contains(&node.name);
+                            let icon = get_icon(&node.action);
+                            let card_class = {
+                                let mut c = String::from("node-card");
+                                if node.is_decision { c.push_str(" decision"); }
+                                if is_active { c.push_str(" active"); }
+                                if is_sel { c.push_str(" selected"); }
+                                c
+                            };
+
+                            rsx! {
+                                g {
+                                    class: "forensic-node",
+                                    onclick: {
+                                        let name = node.name.clone();
+                                        move |_| selected_node.set(Some(name.clone()))
+                                    },
+                                    foreignObject {
+                                        x: node.x,
+                                        y: node.y,
+                                        width: NODE_WIDTH,
+                                        height: NODE_HEIGHT + 44.0,
+                                        div { class: "{card_class}",
+                                            div { class: "vg-action-header",
+                                                div { class: "vg-action-icon", "{icon}" }
+                                                div { style: "min-width: 0;",
+                                                    div { class: "vg-action-title", "{node.name}" }
+                                                    if !node.action.is_empty() {
+                                                        div { class: "vg-action-type", "{node.action}" }
+                                                    } else {
+                                                        div { class: "vg-action-type faint", "state" }
+                                                    }
+                                                }
+                                            }
+                                            if node.is_decision {
+                                                div { class: "vg-decision-hint",
+                                                    span { class: "vg-decision-dot yes" } "then"
+                                                    span { class: "vg-decision-dot no" } "else"
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // 3. Start Indicator
+                    g { class: "vg-start",
+                        circle { cx: 40, cy: 150.0 + NODE_HEIGHT/2.0, r: 10, class: "vg-start-dot" }
+                        path { d: "M 40 {150.0 + NODE_HEIGHT/2.0} L 100 {150.0 + NODE_HEIGHT/2.0}", class: "vg-start-line" }
+                        text { x: 18, y: 150.0 + NODE_HEIGHT/2.0 - 16.0, class: "vg-start-label", "start" }
+                    }
                 }
 
-                // 3. Start Indicator
-                circle { cx: 40, cy: 150.0 + NODE_HEIGHT/2.0, r: 10, fill: "var(--brand-emerald)" }
-                path { d: "M 40 {150.0 + NODE_HEIGHT/2.0} L 100 {150.0 + NODE_HEIGHT/2.0}", stroke: "rgba(255,255,255,0.2)", stroke_width: 2 }
+                if let Some(sel) = selected_details {
+                    div { class: "vg-inspector",
+                        div { class: "label-caps", "node inspector" }
+                        div { class: "vg-inspector-title", "{sel.name}" }
+                        if !sel.action.is_empty() {
+                            div { class: "vg-inspector-row",
+                                span { class: "vg-inspector-k", "action" }
+                                span { class: "vg-inspector-v", "{sel.action}" }
+                            }
+                        }
+                        if sel.is_decision {
+                            div { class: "vg-inspector-row",
+                                span { class: "vg-inspector-k", "branch" }
+                                span { class: "vg-inspector-v", "if/else" }
+                            }
+                        }
+                        div { class: "vg-inspector-row",
+                            span { class: "vg-inspector-k", "position" }
+                            span { class: "vg-inspector-v mono", "x:{sel.x as i64} y:{sel.y as i64}" }
+                        }
+                        button {
+                            class: "btn btn-secondary",
+                            style: "margin-top: 12px; width: 100%;",
+                            onclick: move |_| selected_node.set(None),
+                            "Clear selection"
+                        }
+                    }
+                }
             }
         }
     }

@@ -1,13 +1,6 @@
 use dioxus::prelude::*;
 use crate::components::workflow_graph::WorkflowGraph;
-
-#[derive(PartialEq, Props, Clone)]
-pub struct ViewGenWorkflowProps {
-    pub workflow_name: String,
-    pub version: String,
-    #[props(default)]
-    pub on_edit_requested: EventHandler<()>,
-}
+use crate::app::Route;
 
 #[derive(Clone, Copy, PartialEq)]
 enum DetailTab {
@@ -18,20 +11,18 @@ enum DetailTab {
 }
 
 #[component]
-pub fn ViewGenWorkflow(props: ViewGenWorkflowProps) -> Element {
-    let workflow_name = props.workflow_name.clone();
-    let version = props.version.clone();
+pub fn ViewGenWorkflow(name: String, version: String) -> Element {
     let mut current_tab = use_signal(|| DetailTab::Overview);
-    let on_edit_requested = props.on_edit_requested.clone();
+    let nav = use_navigator();
 
     let detail_res = use_resource({
-        let workflow_name = workflow_name.clone();
+        let name = name.clone();
         let version = version.clone();
         move || {
-            let workflow_name = workflow_name.clone();
+            let name = name.clone();
             let version = version.clone();
             async move {
-                crate::api::get_workflow_detail(&workflow_name, &version).await.ok()
+                crate::api::get_workflow_detail(&name, &version).await.ok()
             }
         }
     });
@@ -56,7 +47,7 @@ pub fn ViewGenWorkflow(props: ViewGenWorkflowProps) -> Element {
                 button {
                     class: "btn btn-primary btn-sm",
                     style: "margin-left: auto; height: 32px;",
-                    onclick: move |_| on_edit_requested.call(()),
+                    onclick: move |_| { nav.push(Route::ViewEdit { name: name.clone(), version: version.clone() }); },
                     "Open in Builder"
                 }
             }
@@ -70,7 +61,7 @@ pub fn ViewGenWorkflow(props: ViewGenWorkflowProps) -> Element {
                         div { class: "studio-card-row",
                             div { class: "studio-glass-card",
                                 div { class: "studio-label", "Policy Identifier" }
-                                div { class: "studio-value", style: "font-family: var(--font-mono); font-size: 18px;", "{workflow_name}" }
+                                div { class: "studio-value", style: "font-family: var(--font-mono); font-size: 18px;", "{name}" }
                             }
                             div { class: "studio-glass-card",
                                 div { class: "studio-label", "Release Target" }
@@ -162,7 +153,7 @@ pub fn ViewGenWorkflow(props: ViewGenWorkflowProps) -> Element {
                                 div { "Trace ID" }
                             }
                             crate::components::activity_list::ActivityList { 
-                                on_select: move |_| {} 
+                                on_select: move |id| { nav.push(Route::ExecutionDetail { id }); } 
                             }
                         }
                     }
@@ -171,4 +162,3 @@ pub fn ViewGenWorkflow(props: ViewGenWorkflowProps) -> Element {
         }
     }
 }
-

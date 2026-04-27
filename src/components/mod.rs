@@ -16,3 +16,4 @@ pub mod workflow_graph;
 pub mod integrations;
 pub mod visualize;
 pub mod execution_detail;
+pub mod navbar;
