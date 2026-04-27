@@ -5,6 +5,7 @@
 //! editor with source on the left and output on the right.
 
 use dioxus::prelude::*;
+use crate::i18n::messages::{workflow, labels, placeholders, format_message};
 
 /// Workflow creator view — input RheLang, preview, and compile.
 #[component]
@@ -75,7 +76,7 @@ pub fn WorkflowCreator() -> Element {
                             class: "form-input",
                             style: "flex: 1;",
                             value: "{nl_prompt}",
-                            placeholder: "Describe your workflow...",
+                            placeholder: placeholders::DESCRIPTION,
                             oninput: move |e| nl_prompt.set(e.value()),
                             disabled: *generating.read(),
                         }
@@ -92,22 +93,22 @@ pub fn WorkflowCreator() -> Element {
                                     match crate::api::generate_workflow(&p).await {
                                         Ok(res) => {
                                             if let Some(err) = res.error {
-                                                compile_status.set("AI Error".to_string());
+                                                compile_status.set(format_message(&workflow::GENERATION_FAILED));
                                                 compiled_output.set(err);
                                             } else {
                                                 source_code.set(res.source_code);
-                                                compile_status.set("AI Drafted".to_string());
+                                                compile_status.set(format_message(&workflow::GENERATED_SUCCESS));
                                             }
                                         },
                                         Err(e) => {
-                                            compile_status.set("Network Offline".to_string());
+                                            compile_status.set(format_message(&crate::i18n::messages::system::NETWORK_ERROR));
                                             compiled_output.set(e);
                                         }
                                     }
                                     generating.set(false);
                                 });
                             },
-                            if *generating.read() { "..." } else { "✨ Generate" }
+                            if *generating.read() { "..." } else { labels::GENERATE }
                         }
                     }
                     div { class: "form-group",
@@ -131,29 +132,29 @@ pub fn WorkflowCreator() -> Element {
                                     match crate::api::compile_workflow(&source).await {
                                         Ok(res) => {
                                             if !res.success {
-                                                compile_status.set("Compilation Failed".to_string());
+                                                compile_status.set(format_message(&workflow::COMPILE_FAILED));
                                                 let mut trace = String::new();
                                                 if let Some(err) = &res.error { trace.push_str(&format!("ERROR:\n{}\n\n", err)); }
                                                 if let Some(code) = &res.generated_rust { trace.push_str(&format!("Generated Rust (partial):\n{}", code)); }
                                                 compiled_output.set(trace);
                                             } else {
-                                                compile_status.set(format!("Success ({} v{})", res.workflow_name, res.version));
+                                                compile_status.set(format!("{} ({} v{})", workflow::COMPILE_SUCCESS.text, res.workflow_name, res.version));
                                                 if let Some(code) = &res.generated_rust { compiled_output.set(code.clone()); }
                                             }
                                         },
                                         Err(e) => {
-                                            compile_status.set("Network Error".to_string());
+                                            compile_status.set(format_message(&crate::i18n::messages::system::NETWORK_ERROR));
                                             compiled_output.set(e);
                                         }
                                     }
                                 });
                             },
-                            "⚡ Compile"
+                            labels::COMPILE
                         }
                         label {
                             class: "btn btn-secondary",
                             style: "cursor: pointer; margin: 0; padding: 8px 16px;",
-                            "↑ Upload .rhe"
+                            labels::UPLOAD
                             input {
                                 type: "file",
                                 accept: ".rhe,.txt",
@@ -174,7 +175,7 @@ pub fn WorkflowCreator() -> Element {
                         }
                         div { class: "action-bar-spacer" }
                         button { class: "btn btn-ghost",
-                            "⟳ Reset"
+                            labels::REFRESH
                         }
                     }
                 }
@@ -213,7 +214,7 @@ pub fn WorkflowCreator() -> Element {
                     div { class: "code-block", style: "min-height: 380px;",
                         if compiled_output.read().is_empty() {
                             span { style: "color: var(--text-dim);",
-                                "Compile to see generated output..."
+                                "Compile to see generated output"
                             }
                         } else {
                             "{compiled_output}"
@@ -222,10 +223,10 @@ pub fn WorkflowCreator() -> Element {
 
                     div { class: "action-bar", style: "margin-top: 12px;",
                         button { class: "btn btn-success",
-                            "▸ Deploy"
+                            labels::DEPLOY
                         }
                         button { class: "btn btn-secondary",
-                            "⎘ Copy"
+                            labels::COPY
                         }
                     }
                 }

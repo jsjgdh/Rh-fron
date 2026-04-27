@@ -2,6 +2,7 @@
 
 use dioxus::prelude::*;
 
+use crate::auth::{can_access_route, has_permission, Permission};
 use crate::components::documentation::Documentation;
 use crate::components::execution_detail::ExecutionDetail;
 use crate::components::home::{Home, AuthForm};
@@ -13,6 +14,7 @@ use crate::components::view_gen_workflow::ViewGenWorkflow;
 use crate::components::visualize::Visualize;
 use crate::components::view_diff::ViewDiff;
 use crate::components::navbar::Navbar;
+
 
 #[derive(Routable, Clone, PartialEq, Debug)]
 #[rustfmt::skip]
@@ -50,6 +52,8 @@ pub enum Route {
     ViewEdit { name: String, version: String },
     #[route("/workflow/:name/:v1/diff/:v2")]
     ViewDiff { name: String, v1: String, v2: String },
+    #[route("/access-denied")]
+    AccessDenied {},
 }
 
 /// Toast notification state - shared across app
@@ -78,14 +82,15 @@ pub fn show_toast(message: impl Into<String>, toast_type: ToastType) {
         .duration_since(UNIX_EPOCH)
         .unwrap()
         .as_millis() as u64;
-    let toasts = TOASTS.cloned();
-    TOASTS.set([toasts, vec![ToastMessage { id, message: message.into(), toast_type }]].concat());
+    let current = TOASTS.cloned();
+    let mut writer = TOASTS.write();
+    *writer = [current, vec![ToastMessage { id, message: message.into(), toast_type }]].concat();
 }
 
 /// Remove a toast by id
 pub fn remove_toast(id: u64) {
-    let toasts = TOASTS.cloned();
-    TOASTS.set(toasts.into_iter().filter(|t| t.id != id).collect());
+    let mut writer = TOASTS.write();
+    *writer = writer.clone().into_iter().filter(|t| t.id != id).collect();
 }
 
 #[component]
@@ -106,8 +111,22 @@ fn ToastContainer() -> Element {
     // Auto-dismiss toasts after 5 seconds
     use_future(move || async move {
         loop {
-            tokio::time::sleep(std::time::Duration::from_secs(5)).await;
-            let toasts = TOASTS.cloned();
+            #[cfg(target_arch = "wasm32")]
+            {
+                wasm_bindgen_futures::JsFuture::from(js_sys::Promise::new(&mut |resolve, _| {
+                    web_sys::window()
+                        .unwrap()
+                        .set_timeout_with_callback_and_timeout_and_arguments_0(&resolve, 5000)
+                        .unwrap();
+                }))
+                .await
+                .unwrap();
+            }
+            #[cfg(not(target_arch = "wasm32"))]
+            {
+                std::thread::sleep(std::time::Duration::from_secs(5));
+            }
+            let toasts = TOASTS.read().clone();
             if !toasts.is_empty() {
                 // Remove the oldest toast
                 let oldest = toasts.iter().min_by_key(|t| t.id);
@@ -177,6 +196,42 @@ fn PublicLayout() -> Element {
     }
 }
 
+/// Navigation item definition for sidebar
+#[derive(Clone)]
+struct SidebarNavItem {
+    label: &'static str,
+    route: Route,
+    permission: Permission,
+    icon: Option<&'static str>,
+}
+
+impl SidebarNavItem {
+    fn new(label: &'static str, route: Route, permission: Permission) -> Self {
+        Self {
+            label,
+            route,
+            permission,
+            icon: None,
+        }
+    }
+
+    fn with_icon(label: &'static str, route: Route, permission: Permission, icon: &'static str) -> Self {
+        Self {
+            label,
+            route,
+            permission,
+            icon: Some(icon),
+        }
+    }
+}
+
+/// Navigation group definition
+#[derive(Clone)]
+struct NavGroup {
+    label: &'static str,
+    items: Vec<SidebarNavItem>,
+}
+
 #[component]
 fn WorkspaceLayout() -> Element {
     let mut token = use_signal(crate::api::get_token);
@@ -185,22 +240,96 @@ fn WorkspaceLayout() -> Element {
     let mut is_dark = use_signal(|| false);
     let mut sidebar_open = use_signal(|| false);
     let nav = use_navigator();
+    let current_route = use_route::<Route>();
 
+    // Check authentication
     if token.read().is_none() {
         nav.replace(Route::AuthForm {});
         return rsx! {
             div { class: "fade-in", style: "display: flex; align-items: center; justify-content: center; height: 100vh;",
-                "Redirecting to login..."
+                "Redirecting..."
             }
         };
     }
 
-    let role = user_role.read().clone();
-    let is_admin = role.as_ref().map(|r| r == "System Administrator").unwrap_or(false);
-    let is_architect = role.as_ref().map(|r| r == "Policy Architect").unwrap_or(false);
-    let is_operator = role.as_ref().map(|r| r == "Operator").unwrap_or(false);
-    let can_edit = is_admin || is_architect;
-    let can_run = is_admin || is_architect || is_operator;
+    let role_str = user_role.read().clone();
+    let role_ref = role_str.as_deref();
+
+    // Define navigation structure with permissions
+    let nav_groups = vec![
+        NavGroup {
+            label: "Console",
+            items: vec![
+                SidebarNavItem::new("Console", Route::Dashboard {}, Permission::DashboardView),
+            ],
+        },
+        NavGroup {
+            label: "Studio",
+            items: vec![
+                SidebarNavItem::new("Studio", Route::Upload {}, Permission::WorkflowsCreate),
+            ],
+        },
+        NavGroup {
+            label: "Forensics",
+            items: vec![
+                SidebarNavItem::new("Visualizer", Route::Visualize {}, Permission::ExecutionsView),
+                SidebarNavItem::new("History", Route::History {}, Permission::ExecutionsView),
+                SidebarNavItem::new("Ledger", Route::Ledger {}, Permission::WorkflowsView),
+            ],
+        },
+        NavGroup {
+            label: "Management",
+            items: vec![
+                SidebarNavItem::new("Integrations", Route::Integrations {}, Permission::IntegrationsView),
+                SidebarNavItem::new("Settings", Route::Settings {}, Permission::SettingsView),
+            ],
+        },
+        NavGroup {
+            label: "Support",
+            items: vec![
+                SidebarNavItem::new("Docs", Route::Documentation {}, Permission::DashboardView),
+            ],
+        },
+    ];
+
+    // Filter navigation based on permissions
+    let filtered_groups: Vec<NavGroup> = nav_groups
+        .into_iter()
+        .map(|mut group| {
+            group.items.retain(|item| has_permission(role_ref, &item.permission));
+            group
+        })
+        .filter(|group| !group.items.is_empty())
+        .collect();
+
+    // Check if current route is accessible
+    let current_path = match &current_route {
+        Route::Dashboard {} => "/dashboard",
+        Route::Upload {} => "/upload",
+        Route::Visualize {} => "/visualize",
+        Route::History {} => "/history",
+        Route::Ledger {} => "/ledger",
+        Route::Documentation {} => "/docs",
+        Route::Settings {} => "/settings",
+        Route::Integrations {} => "/integrations",
+        Route::ExecutionDetail { .. } => "/execution",
+        Route::ViewGenWorkflow { .. } => "/workflow",
+        Route::ViewEdit { .. } => "/workflow/edit",
+        Route::ViewDiff { .. } => "/workflow/diff",
+        _ => "",
+    };
+
+    // If user can't access current route, redirect to dashboard or access denied
+    if !current_path.is_empty() && !can_access_route(role_ref, current_path) {
+        nav.replace(Route::AccessDenied {});
+        return rsx! {
+            div { class: "fade-in", style: "display: flex; align-items: center; justify-content: center; height: 100vh;",
+                "Checking permissions..."
+            }
+        };
+    }
+
+    let sidebar_open_signal = *sidebar_open.read();
 
     rsx! {
         div {
@@ -244,31 +373,18 @@ fn WorkspaceLayout() -> Element {
                     }
                 }
 
-                nav { class: "nav-group",
-                    Link { class: "nav-item", to: Route::Dashboard {}, "Console" }
-                    if can_edit {
-                        Link { class: "nav-item", to: Route::Upload {}, "Studio" }
+                // Render filtered navigation groups
+                for group in filtered_groups.iter() {
+                    div { class: "nav-label", "{group.label}" }
+                    nav { class: "nav-group",
+                        for item in group.items.iter() {
+                            Link {
+                                class: "nav-item",
+                                to: item.route.clone(),
+                                "{item.label}"
+                            }
+                        }
                     }
-                }
-
-                div { class: "nav-label", "Forensics" }
-                nav { class: "nav-group",
-                    if can_run {
-                        Link { class: "nav-item", to: Route::Visualize {}, "Visualizer" }
-                    }
-                    Link { class: "nav-item", to: Route::History {}, "History" }
-                    Link { class: "nav-item", to: Route::Ledger {}, "Ledger" }
-                }
-
-                div { class: "nav-label", "Management" }
-                nav { class: "nav-group",
-                    Link { class: "nav-item", to: Route::Integrations {}, "Integrations" }
-                    Link { class: "nav-item", to: Route::Settings {}, "Settings" }
-                }
-
-                div { class: "nav-label", "Support" }
-                nav { class: "nav-group",
-                    Link { class: "nav-item", to: Route::Documentation {}, "Docs" }
                 }
 
                 if let Some(email) = user_email.read().as_ref() {
@@ -280,7 +396,7 @@ fn WorkspaceLayout() -> Element {
                             }
                             div {
                                 div { style: "font-size: 13px; font-weight: 700; color: var(--text-primary);", "{email}" }
-                                div { style: "font-size: 11px; font-weight: 600; color: var(--accent-primary);", "{role.clone().unwrap_or_default().to_uppercase()}" }
+                                div { style: "font-size: 11px; font-weight: 600; color: var(--accent-primary);", "{role_ref.unwrap_or(\"GUEST\").to_uppercase()}" }
                             }
                         }
                         button { 
@@ -309,8 +425,8 @@ fn WorkspaceLayout() -> Element {
                         class: "btn btn-ghost mobile-menu-toggle",
                         style: "display: none; margin-right: 12px;",
                         aria_label: "Toggle navigation menu",
-                        aria_expanded: "{sidebar_open}",
-                        onclick: move |_| sidebar_open.set(!*sidebar_open),
+                        aria_expanded: "{sidebar_open_signal}",
+                        onclick: move |_| sidebar_open.set(!sidebar_open_signal),
                         "☰"
                     }
                     div { class: "breadcrumb",
@@ -346,6 +462,10 @@ fn Dashboard() -> Element {
         } else {
             ("...".into(), "...".into(), "Stabilizing".into())
         };
+
+    let user_role = crate::api::get_user_role();
+    let role_ref = user_role.as_deref();
+    let _can_run = has_permission(role_ref, &Permission::ExecutionsRun);
 
     rsx! {
         div { class: "fade-in",
@@ -430,11 +550,16 @@ fn About() -> Element {
 fn Settings() -> Element {
     let email = crate::api::get_user_email();
     let role = crate::api::get_user_role();
-    rsx! { SettingsPage { user_email: email, user_role: role } }
+    let role_ref = role.as_deref();
+
+    // Check if user can edit settings
+    let can_edit = has_permission(role_ref, &Permission::SettingsEdit);
+
+    rsx! { SettingsPage { user_email: email, user_role: role, can_edit } }
 }
 
 #[component]
-fn SettingsPage(user_email: Option<String>, user_role: Option<String>) -> Element {
+fn SettingsPage(user_email: Option<String>, user_role: Option<String>, can_edit: bool) -> Element {
     rsx! {
         div { class: "fade-in",
             h1 { class: "page-title", "SETTINGS" }
@@ -463,7 +588,50 @@ fn SettingsPage(user_email: Option<String>, user_role: Option<String>) -> Elemen
                         div { style: "font-weight: 700; font-size: 1.1rem;", "High-Precision Mode" }
                         div { style: "font-size: 13px; color: var(--text-faint);", "Enable forensic tracing by default for all executions." }
                     }
-                    button { class: "btn", "Enabled" }
+                    if can_edit {
+                        button { class: "btn", "Enabled" }
+                    } else {
+                        button { class: "btn", disabled: true, "Enabled" }
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[component]
+fn AccessDenied() -> Element {
+    let nav = use_navigator();
+    let user_role = crate::api::get_user_role();
+
+    rsx! {
+        div { class: "fade-in", style: "display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; padding: 24px;",
+            div { style: "text-align: center; max-width: 480px;",
+                div { style: "font-size: 4rem; margin-bottom: 16px;", "🔒" }
+                h1 { style: "font-size: 2rem; margin-bottom: 16px;", "Access Denied" }
+                p { style: "color: var(--text-secondary); margin-bottom: 24px;",
+                    "You don't have permission to access this resource."
+                }
+                if let Some(role) = user_role {
+                    p { style: "font-size: 0.9rem; color: var(--text-faint); margin-bottom: 32px;",
+                        "Current role: "
+                        span { style: "font-weight: 600; color: var(--text-primary);", "{role}" }
+                    }
+                }
+                div { style: "display: flex; gap: 12px; justify-content: center;",
+                    Link {
+                        class: "btn btn-primary",
+                        to: Route::Dashboard {},
+                        "Go to Dashboard"
+                    }
+                    button {
+                        class: "btn",
+                        onclick: move |_| {
+                            crate::api::logout();
+                            nav.push(Route::Home {});
+                        },
+                        "Sign Out"
+                    }
                 }
             }
         }

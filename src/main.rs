@@ -5,7 +5,9 @@
 
 mod api;
 mod app;
+mod auth;
 mod components;
+mod i18n;
 
 fn main() {
     dioxus::launch(app::App);

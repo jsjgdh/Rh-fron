@@ -2,6 +2,7 @@ use dioxus::prelude::*;
 use crate::api::{login, signup, mfa_verify, mfa_verify_backup, LoginRequest, SignupRequest};
 use crate::components::navbar::Navbar;
 use crate::app::Route;
+use crate::i18n::messages::{auth, labels, placeholders, format_message};
 
 #[component]
 pub fn Home() -> Element {
@@ -28,9 +29,9 @@ pub fn Home() -> Element {
                     div { style: "max-width: 560px; margin: 0 auto; display: flex; gap: 12px; align-items: center;",
                         div { 
                             style: "flex: 1; background: var(--surface); border: 1px solid var(--border-strong); border-radius: 16px; display: flex; align-items: center; padding: 6px 8px; box-shadow: var(--shadow);",
-                            input { 
+                            input {
                                 style: "border: none; margin: 0; padding: 14px 20px; font-size: 16px; background: transparent; width: 100%;",
-                                placeholder: "Your work email",
+                                placeholder: placeholders::EMAIL,
                             }
                             button { 
                                 class: "btn btn-primary", 
@@ -156,7 +157,7 @@ pub fn AuthForm() -> Element {
                             if let Some(r) = res.role { crate::api::set_user_role(&r); }
                             n.push(Route::Dashboard {}); 
                         } 
-                        else { is_signup.set(false); err_signal.set(Some("Account created! Please login.".to_string())); }
+                        else { is_signup.set(false); err_signal.set(Some(format_message(&auth::SIGNUP_SUCCESS))); }
                     }
                     Ok(res) => err_signal.set(res.error),
                     Err(e) => err_signal.set(Some(e)),
@@ -302,29 +303,29 @@ pub fn AuthForm() -> Element {
                     
                     div { class: "auth-input-group",
                         label { class: "nav-label", style: "padding: 0; margin-bottom: 8px;", "Work Email" }
-                        input { 
-                            r#type: "email", 
-                            placeholder: "name@company.com", 
-                            value: "{email}", 
-                            oninput: move |e| email.set(e.value()) 
+                        input {
+                            r#type: "email",
+                            placeholder: placeholders::EMAIL,
+                            value: "{email}",
+                            oninput: move |e| email.set(e.value())
                         }
                     }
 
                     div { class: "auth-input-group",
                         label { class: "nav-label", style: "padding: 0; margin-bottom: 8px;", "Password" }
-                        input { 
-                            r#type: "password", 
-                            placeholder: "••••••••", 
-                            value: "{password}", 
-                            oninput: move |e| password.set(e.value()) 
+                        input {
+                            r#type: "password",
+                            placeholder: placeholders::PASSWORD,
+                            value: "{password}",
+                            oninput: move |e| password.set(e.value())
                         }
                     }
 
                     if *is_signup.read() {
                         div { class: "auth-input-group",
                             label { class: "nav-label", style: "padding: 0; margin-bottom: 8px;", "Select Role" }
-                            select { 
-                                value: "{role}", 
+                            select {
+                                value: "{role}",
                                 onchange: move |e| role.set(e.value()),
                                 option { value: "Policy Architect", "Policy Architect" }
                                 option { value: "Operator", "Operator" }
@@ -345,26 +346,26 @@ pub fn AuthForm() -> Element {
                         onclick: handle_auth,
                         if *loading.read() {
                             span { class: "spinner spinner-sm", style: "margin-right: 8px;" }
-                            "PROCESSING..."
+                            "Processing..."
                         } else {
-                            if *is_signup.read() { "START FREE TRIAL" } else { "ENTER WORKSPACE" }
+                            if *is_signup.read() { labels::CREATE_ACCOUNT } else { labels::SIGN_IN }
                         }
                     }
 
                     div { style: "margin-top: 32px; text-align: center; font-size: 14px; color: var(--text-faint); font-weight: 600;",
                         if *is_signup.read() {
                             "Already have an account? "
-                            span { 
-                                style: "color: var(--accent-primary); cursor: pointer; text-decoration: underline;", 
-                                onclick: move |_| is_signup.set(false), 
-                                "Sign In" 
+                            span {
+                                style: "color: var(--accent-primary); cursor: pointer; text-decoration: underline;",
+                                onclick: move |_| is_signup.set(false),
+                                {labels::SIGN_IN}
                             }
                         } else {
                             "New to Rhexiom? "
-                            span { 
-                                style: "color: var(--accent-primary); cursor: pointer; text-decoration: underline;", 
-                                onclick: move |_| is_signup.set(true), 
-                                "Create an account" 
+                            span {
+                                style: "color: var(--accent-primary); cursor: pointer; text-decoration: underline;",
+                                onclick: move |_| is_signup.set(true),
+                                {labels::CREATE_ACCOUNT}
                             }
                         }
                     }

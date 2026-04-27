@@ -1,7 +1,8 @@
 use dioxus::prelude::*;
 use serde_json::Value;
-use crate::api::{get_execution_detail, get_workflow_detail};
+use crate::api::{get_execution_detail, get_workflow_detail, simulate_execution, SimulationResult};
 use crate::components::workflow_graph::WorkflowGraph;
+use crate::components::simulation_view::SimulationView;
 
 #[component]
 pub fn ExecutionDetail(id: String) -> Element {
@@ -25,6 +26,9 @@ pub fn ExecutionDetail(id: String) -> Element {
             }
         }
     });
+    
+    let simulation = use_signal(|| None::<SimulationResult>);
+    let simulation_loading = use_signal(|| false);
 
     let exec_state = execution.read();
     let wf_state = workflow.read();
@@ -68,13 +72,28 @@ pub fn ExecutionDetail(id: String) -> Element {
                             button { 
                                 class: "btn btn-secondary", 
                                 style: "background: var(--bg); border: 1px solid var(--accent); color: var(--accent);",
+                                disabled: *simulation_loading.read(),
                                 onclick: move |_| {
                                     let id = id.clone();
+                                    simulation_loading.set(true);
                                     spawn(async move {
-                                        let _ = crate::api::simulate_execution(&id).await;
+                                        match simulate_execution(&id).await {
+                                            Ok(result) => {
+                                                simulation.set(Some(result));
+                                            }
+                                            Err(e) => {
+                                                // Error will be logged, UI will show empty state
+                                                tracing::error!("Simulation failed: {}", e);
+                                            }
+                                        }
+                                        simulation_loading.set(false);
                                     });
                                 },
-                                "Simulate what-if branch"
+                                if *simulation_loading.read() {
+                                    "Running simulation..."
+                                } else {
+                                    "Simulate what-if branch"
+                                }
                             }
                             span { class: "badge badge-{status_lower}", "{status}" }
                         }
@@ -142,6 +161,14 @@ pub fn ExecutionDetail(id: String) -> Element {
                             }
                         }
                     }
+                }
+            }
+            
+            // Simulation overlay
+            if let Some(sim) = simulation.read().as_ref() {
+                SimulationView {
+                    simulation: sim.clone(),
+                    on_close: move |_| simulation.set(None)
                 }
             }
         }

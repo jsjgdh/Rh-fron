@@ -1,5 +1,6 @@
 //! Frontend component modules.
 
+pub mod simulation_view;
 pub mod documentation;
 pub mod execution_form;
 pub mod execution_result;

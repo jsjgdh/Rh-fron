@@ -476,19 +476,139 @@ pub async fn get_execution_detail(execution_id: &str) -> Result<serde_json::Valu
     }
 }
 
-/// Run a what-if simulation for an execution.
-pub async fn simulate_execution(execution_id: &str) -> Result<serde_json::Value, String> {
+/// Simulation mode - Quick (first decision path) or Full (all branches).
+#[derive(Debug, Clone, PartialEq)]
+pub enum SimulationMode {
+    Quick,
+    Full,
+}
+
+impl SimulationMode {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            SimulationMode::Quick => "quick",
+            SimulationMode::Full => "full",
+        }
+    }
+}
+
+/// Request to run a workflow simulation.
+#[derive(Debug, Serialize)]
+pub struct SimulateRequest {
+    pub workflow_name: String,
+    pub version: String,
+    pub input: HashMap<String, serde_json::Value>,
+    pub mode: String,
+    pub enable_external_calls: bool,
+}
+
+/// A single step in the simulation trace.
+#[derive(Debug, Deserialize, Clone)]
+pub struct SimulationStep {
+    pub step_name: String,
+    pub action: Option<String>,
+    pub timestamp_us: u64,
+    pub variables: HashMap<String, serde_json::Value>,
+    pub duration_us: u64,
+    pub shadowed: bool,
+}
+
+/// Represents a decision path taken during execution.
+#[derive(Debug, Deserialize, Clone)]
+pub struct DecisionPath {
+    pub step_name: String,
+    pub condition: Option<String>,
+    pub branch_taken: String,
+    pub alternative_branches: Vec<String>,
+}
+
+/// Detailed simulation trace.
+#[derive(Debug, Deserialize, Clone)]
+pub struct SimulationTrace {
+    pub workflow_name: String,
+    pub version: String,
+    pub steps: Vec<SimulationStep>,
+    pub total_duration_us: u64,
+    pub decision_paths: Vec<DecisionPath>,
+}
+
+/// An action that would be executed during simulation.
+#[derive(Debug, Deserialize, Clone)]
+pub struct SimulatedAction {
+    pub name: String,
+    pub step_name: String,
+    pub executed: bool,
+    pub result: Option<serde_json::Value>,
+    pub error: Option<String>,
+}
+
+/// Execution timing information.
+#[derive(Debug, Deserialize, Clone)]
+pub struct ExecutionTiming {
+    pub total_duration_us: u64,
+    pub execution_time_us: u64,
+    pub external_call_time_us: u64,
+    pub memory_usage_bytes: u64,
+    pub step_timings: HashMap<String, u64>,
+}
+
+/// Simulation metadata.
+#[derive(Debug, Deserialize, Clone)]
+pub struct SimulationMetadata {
+    pub mode: String,
+    pub external_calls_enabled: bool,
+    pub started_at: String,
+    pub steps_executed: usize,
+    pub branches_explored: usize,
+}
+
+/// Full simulation result response.
+#[derive(Debug, Deserialize, Clone)]
+pub struct SimulationResult {
+    pub original_execution_id: Option<String>,
+    pub simulation_execution_id: String,
+    pub status: String,
+    pub workflow_name: String,
+    pub version: String,
+    pub trace: SimulationTrace,
+    pub actions: Vec<SimulatedAction>,
+    pub error: Option<String>,
+    pub timing: ExecutionTiming,
+    pub metadata: SimulationMetadata,
+}
+
+/// Run a what-if simulation for a historical execution.
+pub async fn simulate_execution(execution_id: &str) -> Result<SimulationResult, String> {
     let res = authorized_request(reqwest::Method::POST, format!("{}/executions/{}/simulate", &*API_BASE, execution_id))
         .send()
         .await
         .map_err(|e| format!("Network connection failed: {}", e))?;
 
     if res.status().is_success() {
-        res.json::<serde_json::Value>()
+        res.json::<SimulationResult>()
             .await
             .map_err(|e| format!("Failed to parse simulation result: {}", e))
     } else {
         Err(format!("Simulation failed with status: {}", res.status()))
+    }
+}
+
+/// Run a direct simulation for a workflow with given inputs.
+pub async fn simulate_workflow(req: &SimulateRequest) -> Result<SimulationResult, String> {
+    let res = authorized_request(reqwest::Method::POST, format!("{}/simulate", &*API_BASE))
+        .json(req)
+        .send()
+        .await
+        .map_err(|e| format!("Network connection failed: {}", e))?;
+
+    if res.status().is_success() {
+        res.json::<SimulationResult>()
+            .await
+            .map_err(|e| format!("Failed to parse simulation result: {}", e))
+    } else {
+        let status = res.status();
+        let error_text = res.text().await.unwrap_or_else(|_| "Unknown error".to_string());
+        Err(format!("Simulation failed with status {}: {}", status, error_text))
     }
 }
 
