@@ -5,6 +5,7 @@ use dioxus::prelude::*;
 use crate::components::documentation::Documentation;
 use crate::components::execution_detail::ExecutionDetail;
 use crate::components::home::{Home, AuthForm};
+use crate::components::integrations::Integrations;
 use crate::components::upload::Upload;
 use crate::components::version_list::VersionList;
 use crate::components::view_edit::ViewEdit;
@@ -20,7 +21,7 @@ pub enum Route {
     Home {},
     #[route("/login")]
     AuthForm {},
-    #[route("/about-us")]
+    #[route("/about")]
     About {},
 
     #[layout(WorkspaceLayout)]
@@ -38,6 +39,8 @@ pub enum Route {
     Documentation {},
     #[route("/settings")]
     Settings {},
+    #[route("/integrations")]
+    Integrations {},
     #[route("/execution/:id")]
     ExecutionDetail { id: String },
     #[route("/workflow/:name/:version")]
@@ -70,6 +73,22 @@ fn WorkspaceLayout() -> Element {
     let mut user_role = use_signal(crate::api::get_user_role);
     let nav = use_navigator();
 
+    if token.read().is_none() {
+        nav.replace(Route::AuthForm {});
+        return rsx! {
+            div { class: "fade-in", style: "display: flex; align-items: center; justify-content: center; height: 100vh;",
+                "Redirecting to login..."
+            }
+        };
+    }
+
+    let role = user_role.read().clone();
+    let is_admin = role.as_ref().map(|r| r == "System Administrator").unwrap_or(false);
+    let is_architect = role.as_ref().map(|r| r == "Policy Architect").unwrap_or(false);
+    let is_operator = role.as_ref().map(|r| r == "Operator").unwrap_or(false);
+    let can_edit = is_admin || is_architect;
+    let can_run = is_admin || is_architect || is_operator;
+
     rsx! {
         div { class: "app-container fade-in",
             aside { class: "sidebar",
@@ -83,12 +102,16 @@ fn WorkspaceLayout() -> Element {
 
                 nav { class: "nav-group",
                     Link { class: "nav-item", to: Route::Dashboard {}, "Console" }
-                    Link { class: "nav-item", to: Route::Upload {}, "Studio" }
+                    if can_edit {
+                        Link { class: "nav-item", to: Route::Upload {}, "Studio" }
+                    }
                 }
 
                 div { class: "nav-label", "Forensics" }
                 nav { class: "nav-group",
-                    Link { class: "nav-item", to: Route::Visualize {}, "Visualizer" }
+                    if can_run {
+                        Link { class: "nav-item", to: Route::Visualize {}, "Visualizer" }
+                    }
                     Link { class: "nav-item", to: Route::History {}, "History" }
                     Link { class: "nav-item", to: Route::Ledger {}, "Ledger" }
                 }
@@ -96,8 +119,14 @@ fn WorkspaceLayout() -> Element {
                 div { class: "nav-label", "Support" }
                 nav { class: "nav-group",
                     Link { class: "nav-item", to: Route::Documentation {}, "Docs" }
-                    Link { class: "nav-item", to: Route::About {}, "About" }
                     Link { class: "nav-item", to: Route::Settings {}, "Settings" }
+                }
+
+                if is_admin {
+                    div { class: "nav-label", style: "margin-top: 24px;", "Administration" }
+                    nav { class: "nav-group",
+                        Link { class: "nav-item", to: Route::Integrations {}, "Integrations" }
+                    }
                 }
 
                 if let Some(email) = user_email.read().as_ref() {

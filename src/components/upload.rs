@@ -7,22 +7,17 @@ pub fn Upload() -> Element {
     let mut file_content = use_signal(String::new);
     let mut is_loading = use_signal(|| false);
     let mut progress = use_signal(|| 0);
-    let mut workflow_name = use_signal(String::new);
-    let mut version = use_signal(|| "v1.0".to_string());
     let mut error_msg = use_signal(|| Option::<String>::None);
     let nav = use_navigator();
 
     let handle_upload = move |_| {
         let content = file_content.read().clone();
-        let name = workflow_name.read().clone();
-        let ver = version.read().clone();
         let mut n = nav.clone();
         
         spawn(async move {
             is_loading.set(true);
             progress.set(10);
             
-            // Simulating steps
             progress.set(30);
             match api::compile_workflow(&content).await {
                 Ok(res) => {
@@ -30,7 +25,10 @@ pub fn Upload() -> Element {
                         error_msg.set(Some(err));
                     } else {
                         progress.set(100);
-                        n.push(Route::ViewGenWorkflow { name, version: ver });
+                        n.push(Route::ViewGenWorkflow { 
+                            name: res.workflow_name, 
+                            version: res.version 
+                        });
                     }
                 }
                 Err(e) => {
@@ -51,31 +49,11 @@ pub fn Upload() -> Element {
             div { style: "display: grid; grid-template-columns: 1fr 1fr; gap: 40px; align-items: start;",
                 // Configuration Side
                 div {
-                    div { class: "section-title", "SPECIFICATION" }
-                    div { class: "card",
-                        div { class: "form-group",
-                            label { class: "form-label", "WORKFLOW NAME" }
-                            input { 
-                                placeholder: "e.g., LeavePolicy",
-                                value: "{workflow_name}",
-                                oninput: move |e| workflow_name.set(e.value())
-                            }
-                        }
-                        div { class: "form-group",
-                            label { class: "form-label", "VERSION" }
-                            input { 
-                                placeholder: "v1.0",
-                                value: "{version}",
-                                oninput: move |e| version.set(e.value())
-                            }
-                        }
-                    }
-
                     div { class: "section-title", "ORCHESTRATION" }
                     button { 
                         class: "btn btn-primary", 
                         style: "width: 100%; height: 56px; font-size: 1.25rem; font-family: var(--font-display);",
-                        disabled: *is_loading.read() || workflow_name.read().is_empty() || file_content.read().is_empty(),
+                        disabled: *is_loading.read() || file_content.read().is_empty(),
                         onclick: handle_upload,
                         if *is_loading.read() { "DECONSTRUCTING..." } else { "START COMPILATION" }
                     }
@@ -90,7 +68,36 @@ pub fn Upload() -> Element {
 
                 // Input Side
                 div {
-                    div { class: "section-title", "SOURCE LOGIC" }
+                    div { 
+                        style: "display: flex; justify-content: space-between; align-items: baseline;",
+                        div { class: "section-title", "SOURCE LOGIC" }
+                        label { 
+                            class: "btn btn-secondary", 
+                            style: "height: 32px; font-size: 11px; cursor: pointer; display: flex; align-items: center;",
+                            r#for: "pdf-upload",
+                            "Import from PDF" 
+                        }
+                    }
+                    input {
+                        id: "pdf-upload",
+                        r#type: "file",
+                        accept: ".pdf",
+                        style: "display: none;",
+                        onchange: move |evt| {
+                            spawn(async move {
+                                if let Some(file_engine) = evt.files() {
+                                    let files = file_engine.files();
+                                    if !files.is_empty() {
+                                        if let Some(content) = file_engine.read_file(&files[0]).await {
+                                            if let Ok(text) = api::extract_pdf(content).await {
+                                                file_content.set(text);
+                                            }
+                                        }
+                                    }
+                                }
+                            });
+                        }
+                    }
                     div { 
                         class: "card",
                         style: "padding: 0; overflow: hidden;",

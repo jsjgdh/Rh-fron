@@ -20,7 +20,6 @@ pub fn Navbar() -> Element {
             }
 
             nav { class: "nav-links",
-                Link { class: "nav-link", to: Route::About {}, "Pricing" }
                 Link { class: "nav-link", to: Route::About {}, "About" }
                 
                 div { style: "width: 1px; height: 16px; background: var(--border-strong); margin: 0 8px;" }
