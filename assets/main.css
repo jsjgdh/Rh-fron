@@ -118,12 +118,18 @@ h1, h2, h3, .brand-name, .nav-item, .nav-label {
 }
 
 ::-webkit-scrollbar-thumb {
-    background: var(--border-strong);
+    background: transparent;
     border-radius: 10px;
     transition: background 0.3s ease;
 }
 
-::-webkit-scrollbar-thumb:hover {
+.sidebar:hover::-webkit-scrollbar-thumb,
+.main-content:hover::-webkit-scrollbar-thumb {
+    background: var(--border-strong);
+}
+
+.sidebar::-webkit-scrollbar-thumb:hover,
+.main-content::-webkit-scrollbar-thumb:hover {
     background: var(--accent-primary);
 }
 
