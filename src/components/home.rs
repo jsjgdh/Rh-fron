@@ -50,7 +50,7 @@ pub fn Home() -> Element {
                             div { class: "mockup-dot" }
                         }
                         img { 
-                            src: asset!("/assets/image copy.png"),
+                            src: asset!("/assets/image_copy.png"),
                             style: "width: 100%; height: auto; display: block;"
                         }
                     }
