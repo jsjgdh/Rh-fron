@@ -110,7 +110,8 @@ h1, h2, h3, .brand-name, .nav-item, .nav-label {
 /* Layout */
 .app-container {
     display: flex;
-    min-height: 100vh;
+    height: 100vh;
+    overflow: hidden;
     background: transparent;
 }
 
@@ -122,9 +123,9 @@ h1, h2, h3, .brand-name, .nav-item, .nav-label {
     display: flex;
     flex-direction: column;
     padding: 40px 24px;
-    position: sticky;
-    top: 0;
     height: 100vh;
+    overflow-y: auto;
+    flex-shrink: 0;
     z-index: 50;
 }
 
@@ -132,7 +133,9 @@ h1, h2, h3, .brand-name, .nav-item, .nav-label {
     flex: 1;
     display: flex;
     flex-direction: column;
-    min-width: 0; /* Prevent flex overflow */
+    min-width: 0;
+    height: 100vh;
+    overflow-y: auto;
 }
 
 .app-header {
