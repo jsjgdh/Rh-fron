@@ -136,6 +136,11 @@ h1, h2, h3, .brand-name, .nav-item, .nav-label {
 /* For Firefox */
 * {
     scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+}
+
+.sidebar:hover,
+.main-content:hover {
     scrollbar-color: var(--border-strong) transparent;
 }
 
