@@ -77,7 +77,7 @@ body {
     margin: 0;
     padding: 0;
     font-family: var(--font-body);
-    background-color: var(--bg);
+    background-color: transparent;
     color: var(--text-primary);
     min-height: 100vh;
     overflow-x: hidden;
@@ -887,39 +887,252 @@ select:focus-visible {
     text-transform: uppercase;
 }
 
-/* Visualizer specific */
-.vg-canvas-svg {
-    background: var(--bg);
-    background-image: 
-        radial-gradient(var(--border) 1px, transparent 1px);
-    background-size: 20px 20px;
-    border-radius: var(--radius-lg);
-}
-
-.pipeline-step {
+/* --- Workflow Logic Graph (Premium forensic view) --- */
+.vg-shell {
     display: flex;
-    gap: 20px;
-    margin-bottom: 24px;
-    padding: 20px;
-    border-radius: var(--radius-md);
-    background: var(--surface-elevated);
+    flex-direction: column;
+    height: 100%;
+    width: 100%;
+    background: var(--bg);
+    border-radius: var(--radius-xl);
+    overflow: hidden;
     border: 1px solid var(--border);
 }
 
-.pipeline-index {
-    font-family: var(--font-display);
-    font-size: 1.5rem;
-    color: var(--accent-primary);
-    opacity: 0.5;
+.vg-toolbar {
+    padding: 16px 24px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 }
 
-.pipeline-title {
+.vg-legend {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+}
+
+.vg-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: var(--text-faint);
+}
+
+.vg-swatch {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--border-strong);
+}
+
+.vg-swatch-active { background: var(--accent-primary); box-shadow: 0 0 8px var(--accent-primary); }
+.vg-swatch-decision { background: var(--status-warning); }
+.vg-swatch-selected { border: 2px solid var(--accent-primary); background: transparent; }
+
+.vg-canvas {
+    flex: 1;
+    position: relative;
+    overflow: auto;
+    background-image: 
+        radial-gradient(var(--border) 1px, transparent 1px);
+    background-size: 30px 30px;
+}
+
+.forensic-path {
+    fill: none;
+    stroke: var(--border-strong);
+    stroke-width: 2.5;
+    transition: all 0.3s ease;
+}
+
+.forensic-path.active {
+    stroke: var(--accent-primary);
+    stroke-width: 3.5;
+    filter: drop-shadow(0 0 4px var(--accent-primary));
+}
+
+.forensic-arrow {
+    fill: var(--border-strong);
+}
+
+.forensic-path.active + .forensic-arrow,
+.forensic-path.active ~ .forensic-arrow {
+    fill: var(--accent-primary);
+}
+
+.vg-edge-label {
+    font-size: 11px;
     font-weight: 700;
-    font-size: 1.1rem;
-    margin-bottom: 4px;
+    fill: var(--text-faint);
+    text-anchor: middle;
+    paint-order: stroke;
+    stroke: var(--bg);
+    stroke-width: 4px;
 }
 
-/* Animations */
+.node-card {
+    background: var(--surface);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-lg);
+    padding: 16px;
+    box-shadow: var(--shadow);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    height: 100%;
+    border-top: 4px solid var(--border-strong);
+}
+
+.node-card:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-lg);
+    border-color: var(--accent-primary);
+}
+
+.node-card.active {
+    border-top-color: var(--accent-primary);
+    background: var(--accent-bg);
+}
+
+.node-card.decision {
+    border-top-color: var(--status-warning);
+}
+
+.node-card.selected {
+    outline: 2px solid var(--accent-primary);
+    outline-offset: 4px;
+}
+
+.vg-action-header {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+}
+
+.vg-action-icon {
+    width: 32px;
+    height: 32px;
+    background: var(--bg-secondary);
+    border-radius: var(--radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    color: var(--text-primary);
+}
+
+.active .vg-action-icon {
+    background: var(--accent-primary);
+    color: white;
+}
+
+.vg-action-title {
+    font-weight: 700;
+    font-size: 13px;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vg-action-type {
+    font-size: 11px;
+    color: var(--text-faint);
+    font-family: var(--font-mono);
+}
+
+.vg-decision-hint {
+    margin-top: auto;
+    display: flex;
+    gap: 12px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border-subtle);
+}
+
+.vg-decision-dot {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--text-faint);
+}
+
+.vg-decision-dot::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+}
+
+.vg-decision-dot.yes::before { background: var(--status-success); }
+.vg-decision-dot.no::before { background: var(--status-error); }
+
+.vg-start-dot {
+    fill: var(--text-primary);
+}
+
+.vg-start-line {
+    stroke: var(--text-primary);
+    stroke-width: 2;
+    stroke-dasharray: 4 2;
+}
+
+.vg-start-label {
+    font-family: var(--font-display);
+    font-size: 14px;
+    fill: var(--text-faint);
+    text-transform: uppercase;
+}
+
+.vg-inspector {
+    position: absolute;
+    top: 24px;
+    right: 24px;
+    width: 280px;
+    background: var(--surface);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-lg);
+    padding: 24px;
+    box-shadow: var(--shadow-lg);
+    animation: slideIn 0.3s ease-out;
+    z-index: 10;
+}
+
+.vg-inspector-title {
+    font-size: 1.2rem;
+    font-weight: 700;
+    margin: 8px 0 16px;
+    color: var(--text-primary);
+}
+
+.vg-inspector-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.vg-inspector-k {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-faint);
+    text-transform: uppercase;
+}
+
+.vg-inspector-v {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
 .hover-scale { transition: transform 0.2s ease; }
 .hover-scale:hover { transform: scale(1.02); }
 
@@ -1089,8 +1302,8 @@ select:focus-visible {
     width: 2px;
     height: 100px;
     background: linear-gradient(to bottom, transparent, var(--accent-primary), transparent);
-    opacity: 0.3;
-    animation: pulse-v 8s linear infinite;
+    opacity: 0.6;
+    animation: pulse-v 12s linear infinite;
 }
 
 @keyframes pulse-v {
@@ -1109,8 +1322,8 @@ select:focus-visible {
 
 @keyframes pulse-h {
     0% { transform: translateX(-100vw); opacity: 0; }
-    20% { opacity: 0.3; }
-    80% { opacity: 0.3; }
+    20% { opacity: 0.5; }
+    80% { opacity: 0.5; }
     100% { transform: translateX(100vw); opacity: 0; }
 }
 

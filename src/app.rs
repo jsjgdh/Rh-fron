@@ -77,11 +77,7 @@ pub static TOASTS: GlobalSignal<Vec<ToastMessage>> = Global::new(|| Vec::new());
 
 /// Show a toast notification
 pub fn show_toast(message: impl Into<String>, toast_type: ToastType) {
-    use std::time::{SystemTime, UNIX_EPOCH};
-    let id = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_millis() as u64;
+    let id = js_sys::Date::now() as u64;
     let current = TOASTS.cloned();
     let mut writer = TOASTS.write();
     *writer = [current, vec![ToastMessage { id, message: message.into(), toast_type }]].concat();
@@ -113,14 +109,13 @@ fn ToastContainer() -> Element {
         loop {
             #[cfg(target_arch = "wasm32")]
             {
-                wasm_bindgen_futures::JsFuture::from(js_sys::Promise::new(&mut |resolve, _| {
+                let _ = wasm_bindgen_futures::JsFuture::from(js_sys::Promise::new(&mut |resolve, _| {
                     web_sys::window()
                         .unwrap()
                         .set_timeout_with_callback_and_timeout_and_arguments_0(&resolve, 5000)
                         .unwrap();
                 }))
-                .await
-                .unwrap();
+                .await;
             }
             #[cfg(not(target_arch = "wasm32"))]
             {

@@ -503,7 +503,7 @@ pub struct SimulateRequest {
 }
 
 /// A single step in the simulation trace.
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone, PartialEq)]
 pub struct SimulationStep {
     pub step_name: String,
     pub action: Option<String>,
@@ -514,7 +514,7 @@ pub struct SimulationStep {
 }
 
 /// Represents a decision path taken during execution.
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone, PartialEq)]
 pub struct DecisionPath {
     pub step_name: String,
     pub condition: Option<String>,
@@ -523,7 +523,7 @@ pub struct DecisionPath {
 }
 
 /// Detailed simulation trace.
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone, PartialEq)]
 pub struct SimulationTrace {
     pub workflow_name: String,
     pub version: String,
@@ -533,7 +533,7 @@ pub struct SimulationTrace {
 }
 
 /// An action that would be executed during simulation.
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone, PartialEq)]
 pub struct SimulatedAction {
     pub name: String,
     pub step_name: String,
@@ -543,7 +543,7 @@ pub struct SimulatedAction {
 }
 
 /// Execution timing information.
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone, PartialEq)]
 pub struct ExecutionTiming {
     pub total_duration_us: u64,
     pub execution_time_us: u64,
@@ -553,7 +553,7 @@ pub struct ExecutionTiming {
 }
 
 /// Simulation metadata.
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone, PartialEq)]
 pub struct SimulationMetadata {
     pub mode: String,
     pub external_calls_enabled: bool,
@@ -563,7 +563,7 @@ pub struct SimulationMetadata {
 }
 
 /// Full simulation result response.
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone, PartialEq)]
 pub struct SimulationResult {
     pub original_execution_id: Option<String>,
     pub simulation_execution_id: String,
