@@ -305,7 +305,7 @@ pub fn AuthForm() -> Element {
                         label { class: "nav-label", style: "padding: 0; margin-bottom: 8px;", "Work Email" }
                         input {
                             r#type: "email",
-                            placeholder: placeholders::EMAIL,
+                            placeholder: "{placeholders::EMAIL}",
                             value: "{email}",
                             oninput: move |e| email.set(e.value())
                         }
@@ -315,7 +315,7 @@ pub fn AuthForm() -> Element {
                         label { class: "nav-label", style: "padding: 0; margin-bottom: 8px;", "Password" }
                         input {
                             r#type: "password",
-                            placeholder: placeholders::PASSWORD,
+                            placeholder: "{placeholders::PASSWORD}",
                             value: "{password}",
                             oninput: move |e| password.set(e.value())
                         }
@@ -348,7 +348,7 @@ pub fn AuthForm() -> Element {
                             span { class: "spinner spinner-sm", style: "margin-right: 8px;" }
                             "Processing..."
                         } else {
-                            if *is_signup.read() { labels::CREATE_ACCOUNT } else { labels::SIGN_IN }
+                            if *is_signup.read() { "{labels::CREATE_ACCOUNT}" } else { "{labels::SIGN_IN}" }
                         }
                     }
 

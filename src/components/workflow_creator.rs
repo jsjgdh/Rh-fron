@@ -108,7 +108,7 @@ pub fn WorkflowCreator() -> Element {
                                     generating.set(false);
                                 });
                             },
-                            if *generating.read() { "..." } else { labels::GENERATE }
+                            if *generating.read() { "..." } else { "{labels::GENERATE}" }
                         }
                     }
                     div { class: "form-group",
@@ -149,12 +149,12 @@ pub fn WorkflowCreator() -> Element {
                                     }
                                 });
                             },
-                            labels::COMPILE
+                            "{labels::COMPILE}"
                         }
                         label {
                             class: "btn btn-secondary",
                             style: "cursor: pointer; margin: 0; padding: 8px 16px;",
-                            labels::UPLOAD
+                            "{labels::UPLOAD}"
                             input {
                                 type: "file",
                                 accept: ".rhe,.txt",
@@ -175,7 +175,7 @@ pub fn WorkflowCreator() -> Element {
                         }
                         div { class: "action-bar-spacer" }
                         button { class: "btn btn-ghost",
-                            labels::REFRESH
+                            "{labels::REFRESH}"
                         }
                     }
                 }
@@ -223,10 +223,10 @@ pub fn WorkflowCreator() -> Element {
 
                     div { class: "action-bar", style: "margin-top: 12px;",
                         button { class: "btn btn-success",
-                            labels::DEPLOY
+                            "{labels::DEPLOY}"
                         }
                         button { class: "btn btn-secondary",
-                            labels::COPY
+                            "{labels::COPY}"
                         }
                     }
                 }

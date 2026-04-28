@@ -160,7 +160,7 @@ pub mod workflow {
     pub const EXECUTION_RUNNING: &str = "Running...";
     pub const EXECUTION_SUSPENDED: &str = "Suspended";
     pub const EXECUTION_COMPLETED: &str = "Completed";
-    pub const EXECUTION_FAILED: &str = "Failed";
+    pub const STATUS_FAILED: &str = "Failed";
 }
 
 /// Organization-related messages.
@@ -373,6 +373,7 @@ pub mod labels {
     pub const DISABLE: &str = "Disable";
     pub const CONFIGURE: &str = "Configure";
     pub const LEARN_MORE: &str = "Learn more";
+    pub const DEPLOY: &str = "Deploy";
 }
 
 /// Placeholder text.

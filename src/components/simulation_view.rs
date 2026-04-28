@@ -69,7 +69,10 @@ pub fn SimulationView(
                     }
                     div { class: "footer-meta",
                         span { "Mode: {simulation.metadata.mode}" }
-                        span { "External calls: {if simulation.metadata.external_calls_enabled { "Enabled" } else { "Disabled" }}" }
+                        {
+                            let status = if simulation.metadata.external_calls_enabled { "Enabled" } else { "Disabled" };
+                            rsx! { span { "External calls: {status}" } }
+                        }
                     }
                 }
             }
@@ -165,7 +168,7 @@ fn TraceStepView(
                 }
                 div { class: "step-meta",
                     span { class: "step-duration", "{format_duration(step.duration_us)}" }
-                    shadow_badge
+                    {shadow_badge}
                     span { class: "expand-icon", if is_expanded { "▼" } else { "▶" } }
                 }
             }
@@ -343,8 +346,9 @@ fn MetricsTab(timing: ExecutionTiming, metadata: SimulationMetadata) -> Element 
                         }
                         div { class: "meta-item",
                             span { class: "meta-label", "External calls:" }
-                            span { class: "meta-value", 
-                                "{if metadata.external_calls_enabled { "Enabled" } else { "Disabled" }}" 
+                            {
+                                let status = if metadata.external_calls_enabled { "Enabled" } else { "Disabled" };
+                                rsx! { span { class: "meta-value", "{status}" } }
                             }
                         }
                         div { class: "meta-item",

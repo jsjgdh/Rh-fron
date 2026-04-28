@@ -1,4 +1,5 @@
 use dioxus::prelude::*;
+use tracing;
 use serde_json::Value;
 use crate::api::{get_execution_detail, get_workflow_detail, simulate_execution, SimulationResult};
 use crate::components::workflow_graph::WorkflowGraph;
@@ -27,8 +28,8 @@ pub fn ExecutionDetail(id: String) -> Element {
         }
     });
     
-    let simulation = use_signal(|| None::<SimulationResult>);
-    let simulation_loading = use_signal(|| false);
+    let mut simulation = use_signal(|| None::<SimulationResult>);
+    let mut simulation_loading = use_signal(|| false);
 
     let exec_state = execution.read();
     let wf_state = workflow.read();

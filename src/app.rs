@@ -1,6 +1,8 @@
 //! Root application component and routing.
 
 use dioxus::prelude::*;
+use js_sys;
+use wasm_bindgen_futures;
 
 use crate::auth::{can_access_route, has_permission, Permission};
 use crate::components::documentation::Documentation;
