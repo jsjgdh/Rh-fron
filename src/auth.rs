@@ -317,6 +317,7 @@ pub fn can_access_route(user_role: Option<&str>, route: &str) -> bool {
         "/integrations" => Some(Permission::IntegrationsView),
         "/settings" => Some(Permission::SettingsView),
         "/docs" => Some(Permission::DashboardView),
+        "/user-manual" => Some(Permission::DashboardView),
         r if r.starts_with("/execution/") => Some(Permission::ExecutionsView),
         r if r.starts_with("/workflow/") && r.contains("/edit") => Some(Permission::WorkflowsEdit),
         r if r.starts_with("/workflow/") => Some(Permission::WorkflowsView),

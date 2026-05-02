@@ -5,7 +5,7 @@ use js_sys;
 use gloo_storage::{Storage, LocalStorage};
 
 use crate::auth::{can_access_route, has_permission, Permission};
-use crate::components::documentation::Documentation;
+use crate::components::documentation::{Documentation, UserManual};
 use crate::components::execution_detail::ExecutionDetail;
 use crate::components::home::{Home, AuthForm};
 use crate::components::integrations::Integrations;
@@ -51,6 +51,8 @@ pub enum Route {
     Ledger {},
     #[route("/docs")]
     Documentation {},
+    #[route("/user-manual")]
+    UserManualRoute {},
     #[route("/templates")]
     Templates {},
     #[route("/settings")]
@@ -276,6 +278,7 @@ impl SidebarNavItem {
             Route::History {} => "/history",
             Route::Ledger {} => "/ledger",
             Route::Documentation {} => "/docs",
+            Route::UserManualRoute {} => "/user-manual",
             Route::Settings {} => "/settings",
             Route::Integrations {} => "/integrations",
             Route::Users {} => "/users",
@@ -390,6 +393,7 @@ fn WorkspaceLayout() -> Element {
             label: "Support",
             items: vec![
                 SidebarNavItem::new("Docs", Route::Documentation {}, Permission::DashboardView),
+                SidebarNavItem::new("User Manual", Route::UserManualRoute {}, Permission::DashboardView),
             ],
         },
     ];
@@ -680,6 +684,11 @@ fn ApprovalsRoute() -> Element {
 }
 
 #[component]
+fn UserManualRoute() -> Element {
+    rsx! { UserManual {} }
+}
+
+#[component]
 fn ViewDiffPage(name: String, v1: String, v2: String) -> Element {
     rsx! { crate::components::view_diff::ViewDiff { name, v1, v2 } }
 }
@@ -894,6 +903,7 @@ fn Breadcrumb(current_route: Route) -> Element {
         Route::History {}          => ("Forensics", "History"),
         Route::Ledger {}           => ("Forensics", "Ledger"),
         Route::Documentation {}    => ("Support", "Documentation"),
+        Route::UserManualRoute {} => ("Support", "User Manual"),
         Route::Templates {}        => ("Studio", "Templates"),
         Route::Settings {}         => ("Management", "Settings"),
         Route::Integrations {}     => ("Management", "Integrations"),
