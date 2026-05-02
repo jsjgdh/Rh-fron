@@ -38,6 +38,9 @@ fn get_icon(action: &str) -> &'static str {
         "stripe" => "S",
         "webhook" => "⇄",
         "http" => "⇄",
+        "approval" => "☑",
+        "wait" => "⏰",
+        "query" => "🔍",
         _ => {
             // Fallback to substring matching for legacy actions
             if lower.contains("notify") { "✉" }
@@ -89,8 +92,8 @@ pub fn WorkflowGraph(props: WorkflowGraphProps) -> Element {
     let mut connections = Vec::new();
 
     if let Some(steps) = steps_array {
-        let mut curr_x = 100.0;
-        let mut curr_y = 150.0;
+        let _curr_x = 100.0;
+        let _curr_y = 150.0;
         let mut visited = std::collections::HashSet::new();
         let mut queue = std::collections::VecDeque::new();
         
@@ -119,6 +122,21 @@ pub fn WorkflowGraph(props: WorkflowGraphProps) -> Element {
                             is_decision = true;
                             then_target = i.get("then_body").and_then(|b| b.as_array()).and_then(|sts| sts.iter().find_map(|s| s.get("Goto").and_then(|g| g.get("target").and_then(|t| t.as_str().map(String::from)))));
                             else_target = i.get("else_body").and_then(|b| b.as_array()).and_then(|sts| sts.iter().find_map(|s| s.get("Goto").and_then(|g| g.get("target").and_then(|t| t.as_str().map(String::from)))));
+                        }
+                        if let Some(_ra) = stmt.get("RequestApproval") {
+                            action = "approval_request".to_string();
+                        }
+                        if let Some(_) = stmt.get("WaitUntil") {
+                            action = "wait_timer".to_string();
+                        }
+                        if let Some(_) = stmt.get("TryCatch") {
+                            action = "try_catch_block".to_string();
+                        }
+                        if let Some(_) = stmt.get("ForEach") {
+                            action = "for_each_loop".to_string();
+                        }
+                        if let Some(cw) = stmt.get("CallWorkflow") {
+                            action = format!("call_{}", cw.get("name").and_then(|v| v.as_str()).unwrap_or("workflow"));
                         }
                     }
                 }

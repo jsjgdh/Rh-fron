@@ -13,7 +13,7 @@ pub fn Visualize() -> Element {
 
     // Initial fetch of workflows
     let _ = use_resource(move || async move {
-        if let Ok(list) = crate::api::list_workflows().await {
+        if let Ok(list) = crate::api::list_workflows(None).await {
             workflows.set(list);
         }
     });

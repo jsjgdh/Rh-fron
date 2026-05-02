@@ -2,7 +2,7 @@
 
 use dioxus::prelude::*;
 use js_sys;
-use wasm_bindgen_futures;
+use gloo_storage::{Storage, LocalStorage};
 
 use crate::auth::{can_access_route, has_permission, Permission};
 use crate::components::documentation::Documentation;
@@ -16,6 +16,13 @@ use crate::components::view_gen_workflow::ViewGenWorkflow;
 use crate::components::visualize::Visualize;
 use crate::components::view_diff::ViewDiff;
 use crate::components::navbar::Navbar;
+use crate::components::users::UserManagement;
+use crate::components::test_suite::TestSuite;
+use crate::components::schedule::ScheduleManager;
+use crate::components::approvals::Approvals;
+use crate::components::builder::Builder;
+use crate::components::compliance::Compliance;
+use crate::components::promotion::Promotion;
 
 
 #[derive(Routable, Clone, PartialEq, Debug)]
@@ -36,16 +43,35 @@ pub enum Route {
     Upload {},
     #[route("/visualize")]
     Visualize {},
+    #[route("/analytics")]
+    Analytics {},
     #[route("/history")]
     History {},
     #[route("/ledger")]
     Ledger {},
     #[route("/docs")]
     Documentation {},
+    #[route("/templates")]
+    Templates {},
     #[route("/settings")]
     Settings {},
     #[route("/integrations")]
     Integrations {},
+    // Phase 3 routes
+    #[route("/users")]
+    Users {},
+    #[route("/test-suite")]
+    TestSuiteRoute {},
+    #[route("/schedule")]
+    ScheduleRoute {},
+    #[route("/approvals")]
+    Approvals {},
+    #[route("/builder")]
+    Builder {},
+    #[route("/compliance")]
+    Compliance {},
+    #[route("/promotion")]
+    Promotion {},
     #[route("/execution/:id")]
     ExecutionDetail { id: String },
     #[route("/workflow/:name/:version")]
@@ -96,7 +122,27 @@ pub fn App() -> Element {
     rsx! {
         document::Link { rel: "stylesheet", href: asset!("/assets/main.css") }
         crate::components::animated_bg::AnimatedBackground {}
-        Router::<Route> {}
+        ErrorBoundary { handle_error: |e| {
+            tracing::error!("Unhandled error: {:?}", e);
+            rsx! {
+                div { style: "display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; padding: 24px;",
+                    div { style: "text-align: center; max-width: 480px;",
+                        div { style: "font-size: 4rem; margin-bottom: 16px;", "⚠️" }
+                        h1 { style: "font-size: 2rem; margin-bottom: 16px;", "Something went wrong" }
+                        p { style: "color: var(--text-secondary); margin-bottom: 24px;", "An unexpected error occurred. Please try refreshing the page." }
+                        button {
+                            class: "btn btn-primary",
+                            onclick: move |_| {
+                                if let Some(win) = web_sys::window() {
+                                    let _ = win.location().reload();
+                                }
+                            },
+                            "Reload Page"
+                        }
+                    }
+                }
+            }
+        }, Router::<Route> {} }
         ToastContainer {}
     }
 }
@@ -220,6 +266,33 @@ impl SidebarNavItem {
             icon: Some(icon),
         }
     }
+
+    fn route_path(&self) -> &'static str {
+        match self.route {
+            Route::Dashboard {} => "/dashboard",
+            Route::Upload {} => "/upload",
+            Route::Visualize {} => "/visualize",
+            Route::Analytics {} => "/analytics",
+            Route::History {} => "/history",
+            Route::Ledger {} => "/ledger",
+            Route::Documentation {} => "/docs",
+            Route::Settings {} => "/settings",
+            Route::Integrations {} => "/integrations",
+            Route::Users {} => "/users",
+            Route::TestSuiteRoute {} => "/test-suite",
+            Route::ScheduleRoute {} => "/schedule",
+            Route::Approvals {} => "/approvals",
+            Route::Builder {} => "/builder",
+            Route::Compliance {} => "/compliance",
+            Route::Promotion {} => "/promotion",
+            Route::Templates {} => "/templates",
+            Route::ExecutionDetail { .. } => "/execution",
+            Route::ViewGenWorkflow { .. } => "/workflow",
+            Route::ViewEdit { .. } => "/workflow/edit",
+            Route::ViewDiff { .. } => "/workflow/diff",
+            _ => "",
+        }
+    }
 }
 
 /// Navigation group definition
@@ -234,7 +307,25 @@ fn WorkspaceLayout() -> Element {
     let mut token = use_signal(crate::api::get_token);
     let mut user_email = use_signal(crate::api::get_user_email);
     let mut user_role = use_signal(crate::api::get_user_role);
-    let mut is_dark = use_signal(|| false);
+    let mut is_dark = use_signal(|| {
+        LocalStorage::get::<String>("rhexiom-theme").unwrap_or_else(|_| "light".to_string()) == "dark"
+    });
+
+    // Effect to persist theme and apply to document body
+    use_effect(move || {
+        let dark = *is_dark.read();
+        let theme = if dark { "dark" } else { "light" };
+        let _ = LocalStorage::set("rhexiom-theme", theme);
+        
+        #[cfg(target_arch = "wasm32")]
+        if let Some(window) = web_sys::window() {
+            if let Some(document) = window.document() {
+                if let Some(body) = document.body() {
+                    let _ = body.set_attribute("data-theme", theme);
+                }
+            }
+        }
+    });
     let mut sidebar_open = use_signal(|| false);
     let nav = use_navigator();
     let current_route = use_route::<Route>();
@@ -264,12 +355,15 @@ fn WorkspaceLayout() -> Element {
             label: "Studio",
             items: vec![
                 SidebarNavItem::new("Studio", Route::Upload {}, Permission::WorkflowsCreate),
+                SidebarNavItem::new("Builder", Route::Builder {}, Permission::WorkflowsEdit),
+                SidebarNavItem::new("Templates", Route::Templates {}, Permission::WorkflowsCreate),
             ],
         },
         NavGroup {
             label: "Forensics",
             items: vec![
                 SidebarNavItem::new("Visualizer", Route::Visualize {}, Permission::ExecutionsView),
+                SidebarNavItem::new("Analytics", Route::Analytics {}, Permission::DashboardView),
                 SidebarNavItem::new("History", Route::History {}, Permission::ExecutionsView),
                 SidebarNavItem::new("Ledger", Route::Ledger {}, Permission::WorkflowsView),
             ],
@@ -278,7 +372,18 @@ fn WorkspaceLayout() -> Element {
             label: "Management",
             items: vec![
                 SidebarNavItem::new("Integrations", Route::Integrations {}, Permission::IntegrationsView),
+                SidebarNavItem::new("Compliance", Route::Compliance {}, Permission::SettingsView),
+                SidebarNavItem::new("Team", Route::Users {}, Permission::UsersView),
                 SidebarNavItem::new("Settings", Route::Settings {}, Permission::SettingsView),
+            ],
+        },
+        NavGroup {
+            label: "Automation",
+            items: vec![
+                SidebarNavItem::new("Test Suite", Route::TestSuiteRoute {}, Permission::WorkflowsEdit),
+                SidebarNavItem::new("Schedules", Route::ScheduleRoute {}, Permission::WorkflowsEdit),
+                SidebarNavItem::new("Promotion", Route::Promotion {}, Permission::ExecutionsRun),
+                SidebarNavItem::new("Approvals", Route::Approvals {}, Permission::ExecutionsRun),
             ],
         },
         NavGroup {
@@ -304,11 +409,20 @@ fn WorkspaceLayout() -> Element {
         Route::Dashboard {} => "/dashboard",
         Route::Upload {} => "/upload",
         Route::Visualize {} => "/visualize",
+        Route::Analytics {} => "/analytics",
         Route::History {} => "/history",
         Route::Ledger {} => "/ledger",
         Route::Documentation {} => "/docs",
         Route::Settings {} => "/settings",
         Route::Integrations {} => "/integrations",
+        Route::Users {} => "/users",
+        Route::TestSuiteRoute {} => "/test-suite",
+        Route::ScheduleRoute {} => "/schedule",
+        Route::Approvals {} => "/approvals",
+        Route::Builder {} => "/builder",
+        Route::Compliance {} => "/compliance",
+        Route::Promotion {} => "/promotion",
+        Route::Templates {} => "/templates",
         Route::ExecutionDetail { .. } => "/execution",
         Route::ViewGenWorkflow { .. } => "/workflow",
         Route::ViewEdit { .. } => "/workflow/edit",
@@ -327,6 +441,7 @@ fn WorkspaceLayout() -> Element {
     }
 
     let sidebar_open_signal = *sidebar_open.read();
+    let active_path = current_path.to_string();
 
     rsx! {
         div {
@@ -340,14 +455,13 @@ fn WorkspaceLayout() -> Element {
                 "Skip to main content"
             }
 
-            // Mobile menu overlay
-            if *sidebar_open.read() {
-                div {
-                    class: "modal-overlay",
-                    style: "display: none;",
-                    onclick: move |_| sidebar_open.set(false),
-                }
-            }
+// Mobile menu overlay
+    if *sidebar_open.read() {
+        div {
+            class: "modal-overlay",
+            onclick: move |_| sidebar_open.set(false),
+        }
+    }
 
             aside {
                 class: if *sidebar_open.read() { "sidebar open" } else { "sidebar" },
@@ -376,7 +490,7 @@ fn WorkspaceLayout() -> Element {
                     nav { class: "nav-group",
                         for item in group.items.iter() {
                             Link {
-                                class: "nav-item",
+                                class: if active_path == item.route_path() { "nav-item active" } else { "nav-item" },
                                 to: item.route.clone(),
                                 "{item.label}"
                             }
@@ -412,25 +526,20 @@ fn WorkspaceLayout() -> Element {
                 }
             }
 
-            main {
+main {
                 class: "main-content",
                 id: "main-content",
                 header {
                     class: "app-header",
-                    // Mobile menu toggle button
                     button {
                         class: "btn btn-ghost mobile-menu-toggle",
-                        style: "display: none; margin-right: 12px;",
+                        style: "margin-right: 12px;",
                         aria_label: "Toggle navigation menu",
                         aria_expanded: "{sidebar_open_signal}",
                         onclick: move |_| sidebar_open.set(!sidebar_open_signal),
                         "☰"
                     }
-                    div { class: "breadcrumb",
-                        span { "RHEXIOM" }
-                        span { class: "breadcrumb-sep", "→" }
-                        span { class: "breadcrumb-current", "SECURE_WORKSPACE" }
-                    }
+                    Breadcrumb { current_route: current_route.clone() }
                     div { style: "display: flex; gap: 16px;",
                         div {
                             class: "badge badge-success",
@@ -466,7 +575,28 @@ fn Dashboard() -> Element {
 
     rsx! {
         div { class: "fade-in",
-            h1 { class: "page-title", "CONSOLE" }
+            div { style: "display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 32px;",
+                h1 { class: "page-title", style: "margin: 0;", "CONSOLE" }
+                
+                // Natural Language Search Bar
+                div { 
+                    style: "width: 100%; max-width: 400px; position: relative;",
+                    input {
+                        class: "search-input",
+                        style: "width: 100%; padding-left: 44px; background: var(--bg-card);",
+                        placeholder: "Ask anything... 'Find policies related to data retention'",
+                        onkeydown: move |evt| {
+                            if evt.key() == Key::Enter {
+                                crate::app::show_toast("Synthesizing semantic intent...".to_string(), crate::app::ToastType::Info);
+                            }
+                        }
+                    }
+                    span { 
+                        style: "position: absolute; left: 16px; top: 50%; transform: translateY(-50%); font-size: 18px; opacity: 0.5;",
+                        "✧" 
+                    }
+                }
+            }
             
             div { class: "grid-4", style: "margin-bottom: 48px;",
                 div { class: "card stat-card",
@@ -497,13 +627,10 @@ fn Dashboard() -> Element {
                     }
                 }
                 
-                aside {
-                    div { class: "section-title", style: "margin-top: 0;", "SYSTEM ALERTS" }
-                    div { style: "display: flex; flex-direction: column; gap: 16px;",
-                        div { class: "card", style: "padding: 16px; border-left: 4px solid var(--status-warning);",
-                            div { style: "font-weight: 700; font-size: 13px; margin-bottom: 4px;", "Rate Limit Warning" }
-                            p { style: "font-size: 12px; color: var(--text-faint); margin: 0;", "HubSpot API is approaching 80% capacity." }
-                        }
+aside {
+    div { class: "section-title", style: "margin-top: 0;", "SYSTEM ALERTS" }
+    SystemAlerts {}
+    }
                         div { class: "card", style: "padding: 16px; border-left: 4px solid var(--status-info);",
                             div { style: "font-weight: 700; font-size: 13px; margin-bottom: 4px;", "Policy Update" }
                             p { style: "font-size: 12px; color: var(--text-faint); margin: 0;", "Global 'ExpenseGate' v2.1 deployed." }
@@ -512,9 +639,6 @@ fn Dashboard() -> Element {
                 }
             }
         }
-    }
-}
-
 #[component]
 fn History() -> Element {
     let nav = use_navigator();
@@ -531,6 +655,28 @@ fn History() -> Element {
 #[component]
 fn Ledger() -> Element {
     rsx! { VersionList {} }
+}
+
+// ── Phase 3 page components ──────────────────────────────────────────────────
+
+#[component]
+fn Users() -> Element {
+    rsx! { UserManagement {} }
+}
+
+#[component]
+fn TestSuiteRoute() -> Element {
+    rsx! { TestSuite {} }
+}
+
+#[component]
+fn ScheduleRoute() -> Element {
+    rsx! { ScheduleManager {} }
+}
+
+#[component]
+fn ApprovalsRoute() -> Element {
+    rsx! { Approvals {} }
 }
 
 #[component]
@@ -687,3 +833,90 @@ fn AboutPage() -> Element {
 }
 
 
+
+#[component]
+fn Analytics() -> Element {
+    rsx! { crate::components::analytics::WorkflowAnalytics {} }
+}
+
+#[component]
+fn Templates() -> Element {
+    rsx! { crate::components::templates::TemplateMarketplace {} }
+}
+
+#[component]
+fn SystemAlerts() -> Element {
+    let alerts_res = use_resource(|| async move { crate::api::get_alerts().await.ok() });
+
+    let loaded = alerts_res.read().clone();
+    match loaded {
+        Some(Some(alerts)) if !alerts.is_empty() => {
+            rsx! {
+                div { style: "display: flex; flex-direction: column; gap: 16px;",
+                    for alert in alerts.into_iter() {
+                        AlertCard { alert }
+                    }
+                }
+            }
+        }
+        _ => {
+            rsx! {
+                div { style: "padding: 16px; text-align: center; color: var(--text-faint); font-size: 13px;", "No system alerts" }
+            }
+        }
+    }
+}
+
+#[component]
+fn AlertCard(alert: crate::api::SystemAlert) -> Element {
+    let border_color = match alert.severity.as_str() {
+        "warning" => "var(--status-warning)",
+        "error" => "var(--status-error)",
+        "info" => "var(--status-info)",
+        _ => "var(--accent-primary)",
+    };
+
+    rsx! {
+        div { class: "card", style: "padding: 16px; border-left: 4px solid {border_color};",
+            div { style: "font-weight: 700; font-size: 13px; margin-bottom: 4px;", "{alert.title}" }
+            p { style: "font-size: 12px; color: var(--text-faint); margin: 0;", "{alert.message}" }
+        }
+    }
+}
+
+#[component]
+fn Breadcrumb(current_route: Route) -> Element {
+    let (section, page) = match &current_route {
+        Route::Dashboard {}        => ("Console", "Dashboard"),
+        Route::Upload {}           => ("Studio", "Upload"),
+        Route::Visualize {}        => ("Forensics", "Visualizer"),
+        Route::Analytics {}        => ("Forensics", "Analytics"),
+        Route::History {}          => ("Forensics", "History"),
+        Route::Ledger {}           => ("Forensics", "Ledger"),
+        Route::Documentation {}    => ("Support", "Documentation"),
+        Route::Templates {}        => ("Studio", "Templates"),
+        Route::Settings {}         => ("Management", "Settings"),
+        Route::Integrations {}     => ("Management", "Integrations"),
+        Route::Users {}            => ("Management", "Team"),
+        Route::TestSuiteRoute {}   => ("Automation", "Test Suite"),
+        Route::ScheduleRoute {}    => ("Automation", "Schedules"),
+        Route::Approvals {}   => ("Automation", "Approvals"),
+        Route::ExecutionDetail { .. } => ("Forensics", "Execution Detail"),
+        Route::ViewGenWorkflow { name, .. } => ("Studio", &name[..]),
+        Route::ViewEdit { name, .. }        => ("Studio", &name[..]),
+        Route::ViewDiff { name, .. }        => ("Studio", &name[..]),
+        _ => ("", ""),
+    };
+
+    rsx! {
+        div { class: "breadcrumb",
+            span { "RHEXIOM" }
+            span { class: "breadcrumb-sep", "→" }
+            if !section.is_empty() {
+                span { style: "color: var(--text-faint);", "{section}" }
+                span { class: "breadcrumb-sep", "→" }
+            }
+            span { class: "breadcrumb-current", "{page}" }
+        }
+    }
+}

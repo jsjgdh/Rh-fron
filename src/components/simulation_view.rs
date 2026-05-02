@@ -7,7 +7,7 @@ pub fn SimulationView(
     simulation: SimulationResult,
     on_close: EventHandler<()>,
 ) -> Element {
-    let selected_tab = use_signal(|| Tab::Trace);
+    let mut selected_tab = use_signal(|| Tab::Trace);
     let expanded_steps = use_signal::<Vec<usize>>(|| Vec::new());
     
     rsx! {
@@ -27,13 +27,13 @@ pub fn SimulationView(
                     }
                 }
                 
-                // Tab Navigation
-                div { class: "simulation-tabs",
-                    TabButton { label: "Execution Trace", tab: Tab::Trace, selected: *selected_tab.read() }
-                    TabButton { label: "Decision Paths", tab: Tab::Decisions, selected: *selected_tab.read() }
-                    TabButton { label: "Actions", tab: Tab::Actions, selected: *selected_tab.read() }
-                    TabButton { label: "Timing & Memory", tab: Tab::Metrics, selected: *selected_tab.read() }
-                }
+// Tab Navigation
+        div { class: "simulation-tabs",
+        TabButton { label: "Execution Trace", tab: Tab::Trace, selected: *selected_tab.read(), on_select: move |t| selected_tab.set(t) }
+        TabButton { label: "Decision Paths", tab: Tab::Decisions, selected: *selected_tab.read(), on_select: move |t| selected_tab.set(t) }
+        TabButton { label: "Actions", tab: Tab::Actions, selected: *selected_tab.read(), on_select: move |t| selected_tab.set(t) }
+        TabButton { label: "Timing & Memory", tab: Tab::Metrics, selected: *selected_tab.read(), on_select: move |t| selected_tab.set(t) }
+        }
                 
                 // Tab Content
                 div { class: "simulation-content",
@@ -89,12 +89,12 @@ enum Tab {
 }
 
 #[component]
-fn TabButton(label: String, tab: Tab, selected: Tab) -> Element {
+fn TabButton(label: String, tab: Tab, selected: Tab, on_select: EventHandler<Tab>) -> Element {
     let is_selected = tab == selected;
     rsx! {
         button {
             class: if is_selected { "tab-btn active" } else { "tab-btn" },
-            onclick: move |_| {},
+            onclick: move |_| on_select.call(tab),
             "{label}"
         }
     }

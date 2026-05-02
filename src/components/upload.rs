@@ -9,11 +9,27 @@ pub fn Upload() -> Element {
     let mut is_shadow_mode = use_signal(|| false);
     let mut progress = use_signal(|| 0);
     let mut error_msg = use_signal(|| Option::<String>::None);
+    let mut current_file = use_signal(|| Option::<FileInfo>::None);
+    let mut extracted_preview = use_signal(|| Option::<String>::None);
     let nav = use_navigator();
+
+    #[derive(Clone)]
+    struct FileInfo {
+        name: String,
+        size: u64,
+    }
+
+    let handle_clear = move |_| {
+        file_content.set(String::new());
+        current_file.set(None);
+        extracted_preview.set(None);
+        progress.set(0);
+        error_msg.set(None);
+    };
 
     let handle_upload = move |_| {
         let content = file_content.read().clone();
-        let mut n = nav.clone();
+        let n = nav.clone();
         
         spawn(async move {
             is_loading.set(true);
@@ -218,13 +234,25 @@ pub fn Upload() -> Element {
                                 if let Some(file_engine) = evt.files() {
                                     let files = file_engine.files();
                                     if !files.is_empty() {
+                                        let file_name = files[0].clone();
                                         if let Some(content) = file_engine.read_file(&files[0]).await {
+                                            current_file.set(Some(FileInfo {
+                                                name: file_name.clone(),
+                                                size: content.len() as u64,
+                                            }));
+                                            progress.set(10);
                                             match api::extract_pdf(content).await {
                                                 Ok(extract_res) => {
-                                                    // Set the deconstructed workflows to the file content
-                                                    file_content.set(extract_res.deconstructed_workflows);
+                                                    progress.set(100);
+                                                    file_content.set(extract_res.deconstructed_workflows.clone());
+                                                    if extract_res.deconstructed_workflows.len() > 500 {
+                                                        extracted_preview.set(Some(extract_res.deconstructed_workflows[..500].to_string() + "..."));
+                                                    } else {
+                                                        extracted_preview.set(Some(extract_res.deconstructed_workflows.clone()));
+                                                    }
                                                 }
                                                 Err(e) => {
+                                                    progress.set(0);
                                                     error_msg.set(Some(format!("PDF extraction failed: {}", e)));
                                                 }
                                             }
@@ -232,6 +260,24 @@ pub fn Upload() -> Element {
                                     }
                                 }
                             });
+                        }
+                    }
+
+                    if let Some(_file) = current_file.read().as_ref() {
+                        div { style: "margin-bottom: 16px; padding: 12px 16px; background: var(--accent-bg); border-radius: 8px; display: flex; align-items: center; justify-content: space-between;",
+                            div { style: "display: flex; align-items: center; gap: 12px;",
+                                div { style: "font-size: 24px;", "📄" }
+                                div {
+                                    div { style: "font-weight: 600; font-size: 14px;", "{_file.name}" }
+                                    div { style: "font-size: 12px; color: var(--text-faint);", "{_file.size} bytes" }
+                                }
+                            }
+                            button {
+                                class: "btn btn-ghost",
+                                style: "font-size: 11px; color: var(--text-faint);",
+                                onclick: handle_clear,
+                                "Clear"
+                            }
                         }
                     }
 
@@ -254,9 +300,20 @@ pub fn Upload() -> Element {
                                 span { style: "font-weight: 900; font-size: 12px; font-family: var(--font-mono);", "{progress}%" }
                             }
                             div { style: "height: 6px; background: rgba(0,0,0,0.1); border-radius: 3px; overflow: hidden;",
-                                div { 
-                                    style: "height: 100%; background: var(--accent-primary); width: {progress}%; transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);" 
+                                div {
+                                    style: "height: 100%; background: var(--accent-primary); width: {progress}%; transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);"
                                 }
+                            }
+                        }
+                    }
+
+                    if let Some(preview) = extracted_preview.read().as_ref() {
+                        div { style: "margin-top: 16px; padding: 16px; background: var(--bg-secondary); border-radius: 8px; border: 1px solid var(--border);",
+                            div { style: "display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;",
+                                span { style: "font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--text-faint);", "Extracted Text Preview" }
+                            }
+                            div { style: "font-size: 12px; font-family: var(--font-mono); color: var(--text-secondary); white-space: pre-wrap; max-height: 150px; overflow-y: auto;",
+                                "{preview}"
                             }
                         }
                     }

@@ -4,7 +4,7 @@ use crate::app::Route;
 
 #[component]
 pub fn WorkflowHistory(name: String, current_version: String) -> Element {
-    let nav = use_navigator();
+    let _nav = use_navigator();
     let name_for_history = name.clone();
     let history = use_resource(move || {
         let name = name_for_history.clone();
@@ -38,7 +38,7 @@ fn HistoryEntry(entry: WorkflowHistoryEntry, is_current: bool, name: String) -> 
     let nav = use_navigator();
     let entry_clone = entry.clone();
     let name_for_diff = name.clone();
-    let name_for_diff2 = name.clone();
+    let _name_for_diff2 = name.clone();
 
     rsx! {
         div {

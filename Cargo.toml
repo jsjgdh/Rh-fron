@@ -6,6 +6,8 @@ edition = "2021"
 [workspace]
 
 [dependencies]
+chrono = "0.4"
+gloo-storage = "0.3.0"
 dioxus = { version = "0.6", features = ["web", "router"] }
 dioxus-logger = "0.7.4"
 lazy_static = "1.5.0"

@@ -116,6 +116,10 @@ pub struct TraceStepResponse {
     pub step_name: String,
     pub action: Option<String>,
     pub timestamp_us: u64,
+    pub span_start: usize,
+    pub span_end: usize,
+    pub line: usize,
+    pub column: usize,
 }
 
 /// Execution trace response format.
@@ -150,6 +154,9 @@ pub struct ResumeRequest {
 pub struct WorkflowSummary {
     pub name: String,
     pub versions: Vec<String>,
+    pub last_updated: String,
+    pub compliance_frameworks: Option<Vec<String>>,
+    pub region: String,
 }
 
 /// Get a pre-configured HTTP client safely wrapping origins.
@@ -204,6 +211,31 @@ pub fn set_user_email(email: &str) {
     }
 }
 
+/// Store refresh token for token rotation.
+pub fn set_refresh_token(token: &str) {
+    #[cfg(target_arch = "wasm32")]
+    {
+        if let Some(window) = web_sys::window() {
+            if let Ok(Some(storage)) = window.local_storage() {
+                let _ = storage.set_item("rhexiom_refresh_token", token);
+            }
+        }
+    }
+}
+
+/// Get stored refresh token.
+pub fn get_refresh_token() -> Option<String> {
+    #[cfg(target_arch = "wasm32")]
+    {
+        if let Some(window) = web_sys::window() {
+            if let Ok(Some(storage)) = window.local_storage() {
+                return storage.get_item("rhexiom_refresh_token").ok().flatten();
+            }
+        }
+    }
+    None
+}
+
 pub fn get_user_role() -> Option<String> {
     #[cfg(target_arch = "wasm32")]
     {
@@ -233,6 +265,7 @@ pub fn logout() {
         if let Some(window) = web_sys::window() {
             if let Ok(Some(storage)) = window.local_storage() {
                 let _ = storage.remove_item("rhexiom_token");
+                let _ = storage.remove_item("rhexiom_refresh_token");
                 let _ = storage.remove_item("rhexiom_email");
                 let _ = storage.remove_item("rhexiom_role");
             }
@@ -247,6 +280,70 @@ fn authorized_request(method: reqwest::Method, url: String) -> reqwest::RequestB
         builder = builder.header("Authorization", format!("Bearer {}", token));
     }
     builder
+}
+
+/// Refresh the access token using the refresh token.
+pub async fn refresh_access_token() -> Result<(), String> {
+    let refresh_token = get_refresh_token().ok_or("No refresh token available")?;
+
+    #[derive(Serialize)]
+    struct RefreshRequest<'a> {
+        refresh_token: &'a str,
+    }
+
+    #[derive(Deserialize)]
+    struct RefreshResponse {
+        success: bool,
+        token: Option<String>,
+        error: Option<String>,
+    }
+
+    let res = client()
+        .request(reqwest::Method::POST, format!("{}/auth/refresh", &*API_BASE))
+        .json(&RefreshRequest { refresh_token: &refresh_token })
+        .send()
+        .await
+        .map_err(|e| format!("Network error during token refresh: {}", e))?;
+
+    let response: RefreshResponse = res
+        .json()
+        .await
+        .map_err(|e| format!("Failed to parse refresh response: {}", e))?;
+
+    if response.success {
+        if let Some(token) = response.token {
+            set_token(&token);
+        }
+        Ok(())
+    } else {
+        Err(response.error.unwrap_or_else(|| "Token refresh failed".to_string()))
+    }
+}
+
+/// Make an authorized request that automatically handles 401 by refreshing the token once.
+pub async fn authorized_request_with_refresh(
+    method: reqwest::Method,
+    url: String,
+) -> Result<reqwest::Response, String> {
+    let res = authorized_request(method.clone(), url.clone())
+        .send()
+        .await
+        .map_err(|e| format!("Network request failed: {}", e))?;
+
+    if res.status() == reqwest::StatusCode::UNAUTHORIZED {
+        if refresh_access_token().await.is_ok() {
+            let res = authorized_request(method, url)
+                .send()
+                .await
+                .map_err(|e| format!("Network request failed after token refresh: {}", e))?;
+            Ok(res)
+        } else {
+            logout();
+            Err("Session expired. Please sign in again.".to_string())
+        }
+    } else {
+        Ok(res)
+    }
 }
 
 /// Request to compile RheLang source via engine layer.
@@ -293,12 +390,16 @@ pub async fn run_workflow(req: &RunRequest) -> Result<RunResponse, String> {
 }
 
 /// Fetch list of deployable workflows natively.
-pub async fn list_workflows() -> Result<Vec<WorkflowSummary>, String> {
+pub async fn list_workflows(query: Option<&str>) -> Result<Vec<WorkflowSummary>, String> {
     #[derive(Deserialize)]
     struct Wrapper {
         workflows: Vec<WorkflowSummary>,
     }
-    let res = authorized_request(reqwest::Method::GET, format!("{}/workflows", &*API_BASE))
+    let mut url = format!("{}/workflows", &*API_BASE);
+    if let Some(q) = query {
+        url = format!("{}?q={}", url, urlencoding::encode(q));
+    }
+    let res = authorized_request(reqwest::Method::GET, url)
         .send()
         .await
         .map_err(|e| format!("Network connection failed: {}", e))?;
@@ -455,8 +556,41 @@ pub async fn get_stats() -> Result<StatsResponse, String> {
         return Err(format!("Server returned HTTP {}", res.status()));
     }
 
-    res.json::<StatsResponse>()
+res.json::<StatsResponse>()
+    .await
+    .map_err(|e| format!("Failed to parse response: {}", e))
+}
+
+/// A system alert for the dashboard.
+#[derive(Debug, Clone, PartialEq, serde::Deserialize)]
+pub struct SystemAlert {
+    pub id: String,
+    pub alert_type: String,
+    pub title: String,
+    pub message: String,
+    pub severity: String,
+}
+
+/// Response containing system alerts.
+#[derive(Debug, Deserialize)]
+pub struct AlertsResponse {
+    pub alerts: Vec<SystemAlert>,
+}
+
+/// Get system alerts for the dashboard.
+pub async fn get_alerts() -> Result<Vec<SystemAlert>, String> {
+    let res = authorized_request(reqwest::Method::GET, format!("{}/alerts", &*API_BASE))
+        .send()
         .await
+        .map_err(|e| format!("Failed to connect to backend: {}", e))?;
+
+    if !res.status().is_success() {
+        return Err(format!("Server returned HTTP {}", res.status()));
+    }
+
+    res.json::<AlertsResponse>()
+        .await
+        .map(|r| r.alerts)
         .map_err(|e| format!("Failed to parse response: {}", e))
 }
 
@@ -775,8 +909,19 @@ pub async fn signup(req: &SignupRequest) -> Result<AuthResponse, String> {
 }
 
 /// List recent workflow executions.
-pub async fn list_recent_executions() -> Result<Vec<ExecutionSummary>, String> {
-    let res = authorized_request(reqwest::Method::GET, format!("{}/executions", &*API_BASE))
+pub async fn list_recent_executions(query: Option<&str>, cursor: Option<&str>) -> Result<Vec<ExecutionSummary>, String> {
+    let mut url = format!("{}/executions", &*API_BASE);
+    let mut params = Vec::new();
+    if let Some(q) = query {
+        params.push(format!("q={}", urlencoding::encode(q)));
+    }
+    if let Some(c) = cursor {
+        params.push(format!("cursor={}", urlencoding::encode(c)));
+    }
+    if !params.is_empty() {
+        url = format!("{}?{}", url, params.join("&"));
+    }
+    let res = authorized_request(reqwest::Method::GET, url)
         .send()
         .await
         .map_err(|e| format!("Connection failed: {}", e))?;
@@ -1173,3 +1318,328 @@ pub async fn mfa_verify_backup(user_id: &str, code: &str) -> Result<MfaVerifyRes
         Err(format!("Backup code verification failed: HTTP {}", res.status()))
     }
 }
+
+#[derive(Debug, Deserialize, Clone, PartialEq)]
+pub struct WorkflowAnalytics {
+    pub name: String,
+    pub execution_count: i64,
+    pub success_rate: f64,
+    pub avg_latency_ms: f64,
+}
+
+/// Fetch aggregated workflow analytics.
+pub async fn get_analytics() -> Result<Vec<WorkflowAnalytics>, String> {
+    let res = authorized_request(reqwest::Method::GET, format!("{}/analytics", &*API_BASE))
+        .send()
+        .await
+        .map_err(|e| format!("Network connection failed: {}", e))?;
+
+    if res.status().is_success() {
+        res.json::<Vec<WorkflowAnalytics>>()
+            .await
+            .map_err(|e| format!("Failed to parse analytics JSON: {}", e))
+    } else {
+        Err(format!("Analytics request failed with status: {}", res.status()))
+    }
+}
+
+/// Promote a specific version of a workflow to latest (Rollback).
+pub async fn promote_version(name: &str, version: &str) -> Result<String, String> {
+    let res = authorized_request(reqwest::Method::POST, format!("{}/workflows/{}/{}/promote", &*API_BASE, name, version))
+        .send()
+        .await
+        .map_err(|e| format!("Network connection failed: {}", e))?;
+
+    if res.status().is_success() {
+        let json = res.json::<serde_json::Value>().await.map_err(|e| format!("Decoding failed: {}", e))?;
+        Ok(json["new_version"].as_str().unwrap_or_default().to_string())
+    } else {
+        Err(format!("Rollback failed: {}", res.status()))
+    }
+}
+
+#[derive(Debug, Deserialize, Clone, PartialEq)]
+pub struct TemplateSummary {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    pub category: String,
+    pub tags: Option<Vec<String>>,
+    pub compliance_frameworks: Option<Vec<String>>,
+    pub usage_count: i32,
+}
+
+#[derive(Debug, Serialize)]
+pub struct InstantiateTemplateRequest {
+    pub workflow_name: String,
+}
+
+/// List all available workflow templates.
+pub async fn list_templates() -> Result<Vec<TemplateSummary>, String> {
+    #[derive(Deserialize)]
+    struct Wrapper {
+        templates: Vec<TemplateSummary>,
+    }
+    let res = authorized_request(reqwest::Method::GET, format!("{}/templates", &*API_BASE))
+        .send()
+        .await
+        .map_err(|e| format!("Network connection failed: {}", e))?;
+
+    if res.status().is_success() {
+        let wrapper = res.json::<Wrapper>().await.map_err(|e| format!("Decoding failed: {}", e))?;
+        Ok(wrapper.templates)
+    } else {
+        Err(format!("Failed to list templates: {}", res.status()))
+    }
+}
+
+/// Instantiate a workflow from a template.
+pub async fn instantiate_template(template_id: &str, workflow_name: &str) -> Result<CompileResponse, String> {
+    let req = InstantiateTemplateRequest {
+        workflow_name: workflow_name.to_string(),
+    };
+    let res = authorized_request(reqwest::Method::POST, format!("{}/templates/{}/instantiate", &*API_BASE, template_id))
+        .json(&req)
+        .send()
+        .await
+        .map_err(|e| format!("Network connection failed: {}", e))?;
+
+    if res.status().is_success() {
+        res.json::<CompileResponse>()
+            .await
+            .map_err(|e| format!("Failed to parse compilation result: {}", e))
+    } else {
+        Err(format!("Instantiation failed: {}", res.status()))
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 3: User Management
+// ─────────────────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct OrgMemberResponse {
+    pub id: String,
+    pub email: String,
+    pub role: String,
+    pub joined_at: String,
+    pub status: String,
+}
+
+/// List all members of the current organization.
+pub async fn list_org_members() -> Result<Vec<crate::components::users::OrgMember>, String> {
+    let res = authorized_request(reqwest::Method::GET, format!("{}/orgs/members", &*API_BASE))
+        .send()
+        .await
+        .map_err(|e| format!("Network error: {}", e))?;
+    if res.status().is_success() {
+        let raw: Vec<OrgMemberResponse> = res.json().await.map_err(|e| e.to_string())?;
+        Ok(raw.into_iter().map(|m| crate::components::users::OrgMember {
+            id: m.id,
+            email: m.email,
+            role: m.role,
+            joined_at: m.joined_at,
+            status: m.status,
+        }).collect())
+    } else {
+        Err(format!("Failed to list members: {}", res.status()))
+    }
+}
+
+#[derive(Debug, Serialize)]
+struct InviteMemberRequest { email: String, role: String }
+
+/// Invite a new member to the organization.
+pub async fn invite_member(email: &str, role: &str) -> Result<(), String> {
+    let req = InviteMemberRequest { email: email.to_string(), role: role.to_string() };
+    let res = authorized_request(reqwest::Method::POST, format!("{}/orgs/members/invite", &*API_BASE))
+        .json(&req)
+        .send()
+        .await
+        .map_err(|e| format!("Network error: {}", e))?;
+    if res.status().is_success() { Ok(()) } else { Err(format!("Invite failed: {}", res.status())) }
+}
+
+#[derive(Debug, Serialize)]
+struct UpdateRoleRequest { role: String }
+
+/// Update a member's role.
+pub async fn update_member_role(member_id: &str, role: &str) -> Result<(), String> {
+    let req = UpdateRoleRequest { role: role.to_string() };
+    let res = authorized_request(reqwest::Method::PATCH, format!("{}/orgs/members/{}/role", &*API_BASE, member_id))
+        .json(&req)
+        .send()
+        .await
+        .map_err(|e| format!("Network error: {}", e))?;
+    if res.status().is_success() { Ok(()) } else { Err(format!("Role update failed: {}", res.status())) }
+}
+
+/// Remove a member from the organization.
+pub async fn remove_member(member_id: &str) -> Result<(), String> {
+    let res = authorized_request(reqwest::Method::DELETE, format!("{}/orgs/members/{}", &*API_BASE, member_id))
+        .send()
+        .await
+        .map_err(|e| format!("Network error: {}", e))?;
+    if res.status().is_success() { Ok(()) } else { Err(format!("Remove failed: {}", res.status())) }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 3: Policy Test Suite
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// List all saved test cases for the current org.
+pub async fn list_test_cases() -> Result<Vec<crate::components::test_suite::TestCase>, String> {
+    let res = authorized_request(reqwest::Method::GET, format!("{}/test-cases", &*API_BASE))
+        .send()
+        .await
+        .map_err(|e| format!("Network error: {}", e))?;
+    if res.status().is_success() {
+        res.json().await.map_err(|e| e.to_string())
+    } else {
+        Err(format!("Failed: {}", res.status()))
+    }
+}
+
+/// Save a test case to the backend.
+pub async fn save_test_case(tc: &crate::components::test_suite::TestCase) -> Result<(), String> {
+    let res = authorized_request(reqwest::Method::POST, format!("{}/test-cases", &*API_BASE))
+        .json(tc)
+        .send()
+        .await
+        .map_err(|e| format!("Network error: {}", e))?;
+    if res.status().is_success() { Ok(()) } else { Err(format!("Save failed: {}", res.status())) }
+}
+
+/// Run a single test case against the backend and return a RunResponse.
+pub async fn run_test_case(tc: &crate::components::test_suite::TestCase) -> Result<RunResponse, String> {
+    let req = RunRequest {
+        workflow_name: tc.workflow_name.clone(),
+        version: tc.version.clone(),
+        input: tc.input.as_object().map(|o| o.iter().map(|(k, v)| (k.clone(), v.clone())).collect()).unwrap_or_default(),
+        execution_mode: "Live".to_string(),
+    };
+    run_workflow(&req).await
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 3: Workflow Scheduling
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// List all scheduled jobs for the current org.
+pub async fn list_scheduled_jobs() -> Result<Vec<crate::components::schedule::ScheduledJob>, String> {
+    let res = authorized_request(reqwest::Method::GET, format!("{}/schedules", &*API_BASE))
+        .send()
+        .await
+        .map_err(|e| format!("Network error: {}", e))?;
+    if res.status().is_success() {
+        res.json().await.map_err(|e| e.to_string())
+    } else {
+        Err(format!("Failed: {}", res.status()))
+    }
+}
+
+#[derive(Debug, Serialize)]
+struct CreateScheduleRequest {
+    workflow_name: String,
+    version: String,
+    cron_expr: Option<String>,
+    run_at: Option<String>,
+}
+
+/// Create a new workflow schedule.
+pub async fn create_schedule(workflow: &str, version: &str, cron: Option<&str>, run_at: Option<&str>) -> Result<(), String> {
+    let req = CreateScheduleRequest {
+        workflow_name: workflow.to_string(),
+        version: version.to_string(),
+        cron_expr: cron.map(str::to_string),
+        run_at: run_at.map(str::to_string),
+    };
+    let res = authorized_request(reqwest::Method::POST, format!("{}/schedules", &*API_BASE))
+        .json(&req)
+        .send()
+        .await
+        .map_err(|e| format!("Network error: {}", e))?;
+    if res.status().is_success() { Ok(()) } else { Err(format!("Create schedule failed: {}", res.status())) }
+}
+
+/// Delete a scheduled job.
+pub async fn delete_schedule(job_id: &str) -> Result<(), String> {
+    let res = authorized_request(reqwest::Method::DELETE, format!("{}/schedules/{}", &*API_BASE, job_id))
+        .send()
+        .await
+        .map_err(|e| format!("Network error: {}", e))?;
+    if res.status().is_success() { Ok(()) } else { Err(format!("Delete failed: {}", res.status())) }
+}
+
+/// Toggle a schedule active/paused state.
+pub async fn toggle_schedule(job_id: &str) -> Result<(), String> {
+    let res = authorized_request(reqwest::Method::PATCH, format!("{}/schedules/{}/toggle", &*API_BASE, job_id))
+        .send()
+        .await
+        .map_err(|e| format!("Network error: {}", e))?;
+    if res.status().is_success() { Ok(()) } else { Err(format!("Toggle failed: {}", res.status())) }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 3: Approval Chains
+// ─────────────────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Deserialize)]
+struct ApprovalResponseItem {
+    id: String,
+    workflow_name: String,
+    version: String,
+    requested_by: String,
+    requested_at: String,
+    input_summary: String,
+    status: String,
+}
+
+/// List approval requests for the current user.
+pub async fn list_pending_approvals() -> Result<Vec<crate::components::approvals::ApprovalRequest>, String> {
+    let res = authorized_request(reqwest::Method::GET, format!("{}/approvals", &*API_BASE))
+        .send()
+        .await
+        .map_err(|e| format!("Network error: {}", e))?;
+    if res.status().is_success() {
+        let raw: Vec<ApprovalResponseItem> = res.json().await.map_err(|e| e.to_string())?;
+        Ok(raw.into_iter().map(|a| {
+            use crate::components::approvals::{ApprovalRequest, ApprovalStatus};
+            ApprovalRequest {
+                id: a.id,
+                workflow_name: a.workflow_name,
+                version: a.version,
+                requested_by: a.requested_by,
+                requested_at: a.requested_at,
+                input_summary: a.input_summary,
+                status: match a.status.as_str() {
+                    "approved" => ApprovalStatus::Approved,
+                    "rejected" => ApprovalStatus::Rejected,
+                    _          => ApprovalStatus::Pending,
+                },
+            }
+        }).collect())
+    } else {
+        Err(format!("Failed: {}", res.status()))
+    }
+}
+
+#[derive(Debug, Serialize)]
+struct ApprovalActionRequest { comment: String }
+
+/// Approve a pending execution.
+pub async fn approve_execution(approval_id: &str, comment: &str) -> Result<(), String> {
+    let req = ApprovalActionRequest { comment: comment.to_string() };
+    let res = authorized_request(reqwest::Method::POST, format!("{}/approvals/{}/approve", &*API_BASE, approval_id))
+        .json(&req).send().await.map_err(|e| format!("Network error: {}", e))?;
+    if res.status().is_success() { Ok(()) } else { Err(format!("Approve failed: {}", res.status())) }
+}
+
+/// Reject a pending execution.
+pub async fn reject_execution(approval_id: &str, comment: &str) -> Result<(), String> {
+    let req = ApprovalActionRequest { comment: comment.to_string() };
+    let res = authorized_request(reqwest::Method::POST, format!("{}/approvals/{}/reject", &*API_BASE, approval_id))
+        .json(&req).send().await.map_err(|e| format!("Network error: {}", e))?;
+    if res.status().is_success() { Ok(()) } else { Err(format!("Reject failed: {}", res.status())) }
+}
+

@@ -1,0 +1,668 @@
+use dioxus::prelude::*;
+
+#[component]
+pub fn Documentation() -> Element {
+    rsx! {
+        div { class: "fade-in",
+            h1 { class: "page-title", "RheLang Documentation" }
+            p { style: "font-size: 1.2rem; color: var(--text-secondary); margin-bottom: 48px; max-width: 900px;",
+                "RheLang v2.0 is a deterministic domain-specific language for modeling business logic as directed acyclic graphs. Every policy is compiled from RheLang into a sandboxed WASM artifact."
+            }
+
+            // ============================================================
+            // SECTION: QUICK START
+            // ============================================================
+            div { class: "section-title", "QUICK START" }
+            div { class: "card",
+                h3 { style: "margin-bottom: 16px; font-size: 1.5rem;", "Your First Workflow" }
+                p { style: "line-height: 1.6; margin-bottom: 16px;", "A workflow defines the logic of your policy. It has inputs, steps, and actions." }
+                pre {
+                    class: "mono",
+                    style: "padding: 20px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; font-size: 13px; overflow-x: auto;",
+                    "workflow ExpenseApproval v1.0 {
+    input {
+        amount: number
+        receipt: boolean
+        department: string
+    }
+
+    start check_amount
+
+    step check_amount {
+        if amount > 5000 {
+            goto manager_review
+        } else {
+            goto auto_approve
+        }
+    }
+
+    step manager_review {
+        action request_manager_approval
+        goto done
+    }
+
+    step auto_approve {
+        action approve
+        goto done
+    }
+
+    step done {
+        action complete
+    }
+}"
+                }
+            }
+
+            // ============================================================
+            // SECTION: LANGUAGE STRUCTURE
+            // ============================================================
+            div { class: "section-title", "LANGUAGE STRUCTURE" }
+
+            div { class: "card", style: "margin-bottom: 24px;",
+                h3 { style: "margin-bottom: 16px; font-size: 1.4rem;", "Workflow Declaration" }
+                p { style: "line-height: 1.6; margin-bottom: 12px;", "Every workflow starts with a declaration that defines its name and version." }
+                pre {
+                    class: "mono",
+                    style: "padding: 16px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; font-size: 13px;",
+                    "workflow [Name] v[Version] {
+    // workflow body
+}"
+                }
+                p { style: "line-height: 1.6; margin-top: 12px;", "Example: " }
+                pre {
+                    class: "mono",
+                    style: "padding: 16px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; font-size: 13px;",
+                    "workflow PaymentProcessing v2.1.0 { ... }"
+                }
+            }
+
+            div { class: "card", style: "margin-bottom: 24px;",
+                h3 { style: "margin-bottom: 16px; font-size: 1.4rem;", "Input Block" }
+                p { style: "line-height: 1.6; margin-bottom: 12px;", "The input block declares all external data that flows into the workflow. Inputs are immutable and strongly typed." }
+                pre {
+                    class: "mono",
+                    style: "padding: 16px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; font-size: 13px;",
+                    "input {
+    amount: number
+    email: string
+    is_approved: boolean
+    tags: [string]
+}"
+                }
+                p { style: "line-height: 1.6; margin-top: 12px; color: var(--text-secondary);", "Available types: number, string, boolean, [type] (array)" }
+            }
+
+            div { class: "card", style: "margin-bottom: 24px;",
+                h3 { style: "margin-bottom: 16px; font-size: 1.4rem;", "Step Definition" }
+                p { style: "line-height: 1.6; margin-bottom: 12px;", "Steps are the building blocks of a workflow. Each step contains statements that execute sequentially." }
+                pre {
+                    class: "mono",
+                    style: "padding: 16px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; font-size: 13px;",
+                    "step step_name {
+    // statements
+    if condition { goto target_step }
+    action action_name
+    return \"result\"
+}"
+                }
+            }
+
+            // ============================================================
+            // SECTION: DATA TYPES
+            // ============================================================
+            div { class: "section-title", "DATA TYPES" }
+
+            div { class: "card",
+                h3 { style: "margin-bottom: 16px; font-size: 1.4rem;", "Type System" }
+                table { style: "width: 100%; border-collapse: collapse; margin-bottom: 20px;",
+                    thead {
+                        tr { style: "border-bottom: 2px solid var(--border);",
+                            th { style: "text-align: left; padding: 12px; font-size: 12px; text-transform: uppercase;", "Type" }
+                            th { style: "text-align: left; padding: 12px; font-size: 12px; text-transform: uppercase;", "Description" }
+                            th { style: "text-align: left; padding: 12px; font-size: 12px; text-transform: uppercase;", "Example" }
+                        }
+                    }
+                    tbody {
+                        tr { style: "border-bottom: 1px solid var(--border-subtle);",
+                            td { class: "mono", style: "padding: 10px; color: var(--accent-primary);", "number" }
+                            td { style: "padding: 10px;", "64-bit floating point" }
+                            td { class: "mono", style: "padding: 10px;", "42.5, -3.14, 1000" }
+                        }
+                        tr { style: "border-bottom: 1px solid var(--border-subtle);",
+                            td { class: "mono", style: "padding: 10px; color: var(--accent-primary);", "string" }
+                            td { style: "padding: 10px;", "UTF-8 text" }
+                            td { class: "mono", style: "padding: 10px;", "\"hello world\"" }
+                        }
+                        tr { style: "border-bottom: 1px solid var(--border-subtle);",
+                            td { class: "mono", style: "padding: 10px; color: var(--accent-primary);", "boolean" }
+                            td { style: "padding: 10px;", "true or false" }
+                            td { class: "mono", style: "padding: 10px;", "true, false" }
+                        }
+                        tr { style: "border-bottom: 1px solid var(--border-subtle);",
+                            td { class: "mono", style: "padding: 10px; color: var(--accent-primary);", "[type]" }
+                            td { style: "padding: 10px;", "Array of type" }
+                            td { class: "mono", style: "padding: 10px;", "[\"a\", \"b\", \"c\"]" }
+                        }
+                    }
+                }
+            }
+
+            // ============================================================
+            // SECTION: EXPRESSIONS
+            // ============================================================
+            div { class: "section-title", "EXPRESSIONS" }
+
+            div { class: "card", style: "margin-bottom: 24px;",
+                h3 { style: "margin-bottom: 16px; font-size: 1.4rem;", "Let Bindings" }
+                p { style: "line-height: 1.6; margin-bottom: 12px;", "Local variables store intermediate values. They are scoped to the step and can reference inputs or other variables." }
+                pre {
+                    class: "mono",
+                    style: "padding: 16px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; font-size: 13px;",
+                    "step process {
+    let subtotal = items.map(|i| i.price).sum()
+    let discount = eligible ? subtotal * 0.1 : 0
+    let total = subtotal - discount
+    if total > 1000 { goto manager_approve }
+}"
+                }
+            }
+
+            div { class: "card", style: "margin-bottom: 24px;",
+                h3 { style: "margin-bottom: 16px; font-size: 1.4rem;", "Method Calls & Chaining" }
+                p { style: "line-height: 1.6; margin-bottom: 12px;", "Objects support method chaining for transformations." }
+                pre {
+                    class: "mono",
+                    style: "padding: 16px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; font-size: 13px;",
+                    "let domain = email.split(\"@\")[1]
+let cleaned = email.trim().to_lowercase()
+let is_valid = domain.starts_with(\"acme\") || domain.ends_with(\".com\")
+let parts = full_name.split(\" \")
+let first_name = parts.first()
+let last_name = parts.last()"
+                }
+            }
+
+            div { class: "card", style: "margin-bottom: 24px;",
+                h3 { style: "margin-bottom: 16px; font-size: 1.4rem;", "Array Literals" }
+                p { style: "line-height: 1.6; margin-bottom: 12px;", "Arrays can be created inline with literal syntax." }
+                pre {
+                    class: "mono",
+                    style: "padding: 16px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; font-size: 13px;",
+                    "let tiers = [\"bronze\", \"silver\", \"gold\", \"platinum\"]
+let emails = [\"a@example.com\", \"b@example.com\"]
+let numbers = [1, 2, 3, 4, 5]
+
+// Array access with index (0-based)
+if tiers[0] == \"bronze\" { goto bronze_tier }"
+                }
+            }
+
+            div { class: "card", style: "margin-bottom: 24px;",
+                h3 { style: "margin-bottom: 16px; font-size: 1.4rem;", "Chained Comparisons" }
+                p { style: "line-height: 1.6; margin-bottom: 12px;", "Mathematical comparisons can be chained together." }
+                pre {
+                    class: "mono",
+                    style: "padding: 16px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; font-size: 13px;",
+                    "// Valid: (x > 0) > -1 is evaluated left-to-right
+if x > 0 > -1 { goto valid_range }
+
+// Common use case: bounds checking
+if 0 < amount < 1000 { goto auto_approve }"
+                }
+            }
+
+            // ============================================================
+            // SECTION: STANDARD LIBRARY
+            // ============================================================
+            div { class: "section-title", "STANDARD LIBRARY" }
+
+            div { class: "card", style: "margin-bottom: 24px;",
+                h3 { style: "margin-bottom: 16px; font-size: 1.4rem;", "String Methods" }
+                table { style: "width: 100%; border-collapse: collapse; margin-bottom: 16px;",
+                    thead {
+                        tr { style: "border-bottom: 2px solid var(--border);",
+                            th { style: "text-align: left; padding: 12px; font-size: 12px; text-transform: uppercase;", "Method" }
+                            th { style: "text-align: left; padding: 12px; font-size: 12px; text-transform: uppercase;", "Description" }
+                            th { style: "text-align: left; padding: 12px; font-size: 12px; text-transform: uppercase;", "Example" }
+                        }
+                    }
+                    tbody {
+                        tr { style: "border-bottom: 1px solid var(--border-subtle);",
+                            td { class: "mono", style: "padding: 10px; color: var(--accent-primary);", ".split(sep)" }
+                            td { style: "padding: 10px;", "Split string by delimiter, returns array" }
+                            td { class: "mono", style: "padding: 10px;", "\"a@b.com\".split(\"@\")" }
+                        }
+                        tr { style: "border-bottom: 1px solid var(--border-subtle);",
+                            td { class: "mono", style: "padding: 10px; color: var(--accent-primary);", ".trim()" }
+                            td { style: "padding: 10px;", "Remove leading/trailing whitespace" }
+                            td { class: "mono", style: "padding: 10px;", "\"  hello  \".trim()" }
+                        }
+                        tr { style: "border-bottom: 1px solid var(--border-subtle);",
+                            td { class: "mono", style: "padding: 10px; color: var(--accent-primary);", ".to_lowercase()" }
+                            td { style: "padding: 10px;", "Convert to lowercase" }
+                            td { class: "mono", style: "padding: 10px;", "\"HELLO\".to_lowercase()" }
+                        }
+                        tr { style: "border-bottom: 1px solid var(--border-subtle);",
+                            td { class: "mono", style: "padding: 10px; color: var(--accent-primary);", ".to_uppercase()" }
+                            td { style: "padding: 10px;", "Convert to uppercase" }
+                            td { class: "mono", style: "padding: 10px;", "\"hello\".to_uppercase()" }
+                        }
+                        tr { style: "border-bottom: 1px solid var(--border-subtle);",
+                            td { class: "mono", style: "padding: 10px; color: var(--accent-primary);", ".replace(from, to)" }
+                            td { style: "padding: 10px;", "Replace all occurrences" }
+                            td { class: "mono", style: "padding: 10px;", "\"hello\".replace(\"l\", \"x\")" }
+                        }
+                        tr { style: "border-bottom: 1px solid var(--border-subtle);",
+                            td { class: "mono", style: "padding: 10px; color: var(--accent-primary);", ".contains(substr)" }
+                            td { style: "padding: 10px;", "Check if contains substring" }
+                            td { class: "mono", style: "padding: 10px;", "\"hello\".contains(\"ell\")" }
+                        }
+                        tr { style: "border-bottom: 1px solid var(--border-subtle);",
+                            td { class: "mono", style: "padding: 10px; color: var(--accent-primary);", ".starts_with(prefix)" }
+                            td { style: "padding: 10px;", "Check if starts with" }
+                            td { class: "mono", style: "padding: 10px;", "\"hello\".starts_with(\"he\")" }
+                        }
+                        tr { style: "border-bottom: 1px solid var(--border-subtle);",
+                            td { class: "mono", style: "padding: 10px; color: var(--accent-primary);", ".ends_with(suffix)" }
+                            td { style: "padding: 10px;", "Check if ends with" }
+                            td { class: "mono", style: "padding: 10px;", "\"hello\".ends_with(\"lo\")" }
+                        }
+                        tr { style: "border-bottom: 1px solid var(--border-subtle);",
+                            td { class: "mono", style: "padding: 10px; color: var(--accent-primary);", ".length" }
+                            td { style: "padding: 10px;", "Get string length" }
+                            td { class: "mono", style: "padding: 10px;", "\"hello\".length" }
+                        }
+                        tr { style: "border-bottom: 1px solid var(--border-subtle);",
+                            td { class: "mono", style: "padding: 10px; color: var(--accent-primary);", ".substring(start, end)" }
+                            td { style: "padding: 10px;", "Extract substring by indices" }
+                            td { class: "mono", style: "padding: 10px;", "\"hello\".substring(0, 2)" }
+                        }
+                    }
+                }
+            }
+
+            div { class: "card", style: "margin-bottom: 24px;",
+                h3 { style: "margin-bottom: 16px; font-size: 1.4rem;", "Math Functions" }
+                table { style: "width: 100%; border-collapse: collapse; margin-bottom: 16px;",
+                    thead {
+                        tr { style: "border-bottom: 2px solid var(--border);",
+                            th { style: "text-align: left; padding: 12px; font-size: 12px; text-transform: uppercase;", "Method" }
+                            th { style: "text-align: left; padding: 12px; font-size: 12px; text-transform: uppercase;", "Description" }
+                            th { style: "text-align: left; padding: 12px; font-size: 12px; text-transform: uppercase;", "Example" }
+                        }
+                    }
+                    tbody {
+                        tr { style: "border-bottom: 1px solid var(--border-subtle);",
+                            td { class: "mono", style: "padding: 10px; color: var(--accent-primary);", ".abs()" }
+                            td { style: "padding: 10px;", "Absolute value" }
+                            td { class: "mono", style: "padding: 10px;", "(-5).abs()" }
+                        }
+                        tr { style: "border-bottom: 1px solid var(--border-subtle);",
+                            td { class: "mono", style: "padding: 10px; color: var(--accent-primary);", ".min(n)" }
+                            td { style: "padding: 10px;", "Minimum of two values" }
+                            td { class: "mono", style: "padding: 10px;", "x.min(y)" }
+                        }
+                        tr { style: "border-bottom: 1px solid var(--border-subtle);",
+                            td { class: "mono", style: "padding: 10px; color: var(--accent-primary);", ".max(n)" }
+                            td { style: "padding: 10px;", "Maximum of two values" }
+                            td { class: "mono", style: "padding: 10px;", "x.max(y)" }
+                        }
+                        tr { style: "border-bottom: 1px solid var(--border-subtle);",
+                            td { class: "mono", style: "padding: 10px; color: var(--accent-primary);", ".round()" }
+                            td { style: "padding: 10px;", "Round to nearest integer" }
+                            td { class: "mono", style: "padding: 10px;", "3.7.round()" }
+                        }
+                        tr { style: "border-bottom: 1px solid var(--border-subtle);",
+                            td { class: "mono", style: "padding: 10px; color: var(--accent-primary);", ".floor()" }
+                            td { style: "padding: 10px;", "Round down" }
+                            td { class: "mono", style: "padding: 10px;", "3.9.floor()" }
+                        }
+                        tr { style: "border-bottom: 1px solid var(--border-subtle);",
+                            td { class: "mono", style: "padding: 10px; color: var(--accent-primary);", ".ceil()" }
+                            td { style: "padding: 10px;", "Round up" }
+                            td { class: "mono", style: "padding: 10px;", "3.1.ceil()" }
+                        }
+                        tr { style: "border-bottom: 1px solid var(--border-subtle);",
+                            td { class: "mono", style: "padding: 10px; color: var(--accent-primary);", ".sum()" }
+                            td { style: "padding: 10px;", "Sum of array elements" }
+                            td { class: "mono", style: "padding: 10px;", "[1,2,3].sum()" }
+                        }
+                        tr { style: "border-bottom: 1px solid var(--border-subtle);",
+                            td { class: "mono", style: "padding: 10px; color: var(--accent-primary);", ".avg()" }
+                            td { style: "padding: 10px;", "Average of array elements" }
+                            td { class: "mono", style: "padding: 10px;", "[1,2,3].avg()" }
+                        }
+                    }
+                }
+            }
+
+            div { class: "card", style: "margin-bottom: 24px;",
+                h3 { style: "margin-bottom: 16px; font-size: 1.4rem;", "Array Methods" }
+                table { style: "width: 100%; border-collapse: collapse; margin-bottom: 16px;",
+                    thead {
+                        tr { style: "border-bottom: 2px solid var(--border);",
+                            th { style: "text-align: left; padding: 12px; font-size: 12px; text-transform: uppercase;", "Method" }
+                            th { style: "text-align: left; padding: 12px; font-size: 12px; text-transform: uppercase;", "Description" }
+                            th { style: "text-align: left; padding: 12px; font-size: 12px; text-transform: uppercase;", "Example" }
+                        }
+                    }
+                    tbody {
+                        tr { style: "border-bottom: 1px solid var(--border-subtle);",
+                            td { class: "mono", style: "padding: 10px; color: var(--accent-primary);", ".first()" }
+                            td { style: "padding: 10px;", "Get first element" }
+                            td { class: "mono", style: "padding: 10px;", "[\"a\",\"b\"].first()" }
+                        }
+                        tr { style: "border-bottom: 1px solid var(--border-subtle);",
+                            td { class: "mono", style: "padding: 10px; color: var(--accent-primary);", ".last()" }
+                            td { style: "padding: 10px;", "Get last element" }
+                            td { class: "mono", style: "padding: 10px;", "[\"a\",\"b\"].last()" }
+                        }
+                        tr { style: "border-bottom: 1px solid var(--border-subtle);",
+                            td { class: "mono", style: "padding: 10px; color: var(--accent-primary);", ".length" }
+                            td { style: "padding: 10px;", "Get array length" }
+                            td { class: "mono", style: "padding: 10px;", "[1,2,3].length" }
+                        }
+                        tr { style: "border-bottom: 1px solid var(--border-subtle);",
+                            td { class: "mono", style: "padding: 10px; color: var(--accent-primary);", ".contains(item)" }
+                            td { style: "padding: 10px;", "Check if array contains item" }
+                            td { class: "mono", style: "padding: 10px;", "[\"a\",\"b\"].contains(\"a\")" }
+                        }
+                    }
+                }
+            }
+
+            div { class: "card", style: "margin-bottom: 24px;",
+                h3 { style: "margin-bottom: 16px; font-size: 1.4rem;", "DateTime Functions" }
+                table { style: "width: 100%; border-collapse: collapse; margin-bottom: 16px;",
+                    thead {
+                        tr { style: "border-bottom: 2px solid var(--border);",
+                            th { style: "text-align: left; padding: 12px; font-size: 12px; text-transform: uppercase;", "Function" }
+                            th { style: "text-align: left; padding: 12px; font-size: 12px; text-transform: uppercase;", "Description" }
+                            th { style: "text-align: left; padding: 12px; font-size: 12px; text-transform: uppercase;", "Example" }
+                        }
+                    }
+                    tbody {
+                        tr { style: "border-bottom: 1px solid var(--border-subtle);",
+                            td { class: "mono", style: "padding: 10px; color: var(--accent-primary);", "datetime.now()" }
+                            td { style: "padding: 10px;", "Get current datetime (ISO 8601)" }
+                            td { class: "mono", style: "padding: 10px;", "datetime.now()" }
+                        }
+                        tr { style: "border-bottom: 1px solid var(--border-subtle);",
+                            td { class: "mono", style: "padding: 10px; color: var(--accent-primary);", "datetime.add_days(dt, n)" }
+                            td { style: "padding: 10px;", "Add n days to datetime" }
+                            td { class: "mono", style: "padding: 10px;", "due_date.add_days(3)" }
+                        }
+                        tr { style: "border-bottom: 1px solid var(--border-subtle);",
+                            td { class: "mono", style: "padding: 10px; color: var(--accent-primary);", "datetime.add_hours(dt, n)" }
+                            td { style: "padding: 10px;", "Add n hours to datetime" }
+                            td { class: "mono", style: "padding: 10px;", "start_time.add_hours(2)" }
+                        }
+                        tr { style: "border-bottom: 1px solid var(--border-subtle);",
+                            td { class: "mono", style: "padding: 10px; color: var(--accent-primary);", "datetime.diff(dt1, dt2, unit)" }
+                            td { style: "padding: 10px;", "Calculate difference (\"hours\" or \"days\")" }
+                            td { class: "mono", style: "padding: 10px;", "created.diff(now, \"hours\")" }
+                        }
+                        tr { style: "border-bottom: 1px solid var(--border-subtle);",
+                            td { class: "mono", style: "padding: 10px; color: var(--accent-primary);", "datetime.is_weekend(dt)" }
+                            td { style: "padding: 10px;", "Check if weekend" }
+                            td { class: "mono", style: "padding: 10px;", "date.is_weekend()" }
+                        }
+                    }
+                }
+            }
+
+            // ============================================================
+            // SECTION: CONTROL FLOW
+            // ============================================================
+            div { class: "section-title", "CONTROL FLOW" }
+
+            div { class: "card", style: "margin-bottom: 24px;",
+                h3 { style: "margin-bottom: 16px; font-size: 1.4rem;", "Conditional Branching (if/else)" }
+                pre {
+                    class: "mono",
+                    style: "padding: 16px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; font-size: 13px;",
+                    "if condition {
+    goto step_a
+} else {
+    goto step_b
+}"
+                }
+            }
+
+            div { class: "card", style: "margin-bottom: 24px;",
+                h3 { style: "margin-bottom: 16px; font-size: 1.4rem;", "Goto Statement" }
+                p { style: "line-height: 1.6; margin-bottom: 12px;", "Unconditionally transfer control to another step." }
+                pre {
+                    class: "mono",
+                    style: "padding: 16px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; font-size: 13px;",
+                    "goto next_step"
+                }
+            }
+
+            div { class: "card", style: "margin-bottom: 24px;",
+                h3 { style: "margin-bottom: 16px; font-size: 1.4rem;", "Return Statement" }
+                p { style: "line-height: 1.6; margin-bottom: 12px;", "End the workflow and return a result value." }
+                pre {
+                    class: "mono",
+                    style: "padding: 16px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; font-size: 13px;",
+                    "return \"Approved\"
+return \"Rejected: amount exceeds limit\""
+                }
+            }
+
+            // ============================================================
+            // SECTION: ACTIONS
+            // ============================================================
+            div { class: "section-title", "ACTIONS" }
+
+            div { class: "card",
+                h3 { style: "margin-bottom: 16px; font-size: 1.4rem;", "Integration Actions" }
+                p { style: "line-height: 1.6; margin-bottom: 16px;", "Actions trigger side effects through integration providers." }
+                pre {
+                    class: "mono",
+                    style: "padding: 16px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; font-size: 13px;",
+                    "action complete
+action approve
+action send_email { to: user_email, subject: \"Hello\", body: \"Message\" }
+action hubspot_get_contact { email: customer_email }
+action salesforce_create_task { lead_id: contact_id, subject: \"Follow up\" }"
+                }
+                p { style: "line-height: 1.6; margin-top: 16px; color: var(--text-secondary);",
+                    "Available actions: complete, approve, fail, done, log, send_email, notify, request_approval, request_manager_approval, escalate, hubspot_get_contact, hubspot_create_deal, salesforce_query, salesforce_upsert_lead, slack_post_message, datadog_send_event, stripe_capture_payment"
+                }
+            }
+
+            // ============================================================
+            // SECTION: EXAMPLE WORKFLOWS
+            // ============================================================
+            div { class: "section-title", "EXAMPLE WORKFLOWS" }
+
+            div { class: "card", style: "margin-bottom: 24px;",
+                h3 { style: "margin-bottom: 16px; font-size: 1.4rem;", "Email Validation & Routing" }
+                pre {
+                    class: "mono",
+                    style: "padding: 16px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; font-size: 12px; overflow-x: auto;",
+                    "workflow EmailValidation v1.0 {
+    input { email: string }
+
+    start validate
+
+    step validate {
+        let domain = email.split(\"@\")[1]
+        let cleaned = email.trim().to_lowercase()
+        let is_corporate = [\"acme.com\", \"corp.com\"].contains(domain)
+
+        if is_corporate {
+            goto corporate_route
+        } else {
+            goto external_route
+        }
+    }
+
+    step corporate_route {
+        action notify { message: \"Corporate email received\" }
+        goto done
+    }
+
+    step external_route {
+        action log { entry: \"External email detected\" }
+        goto done
+    }
+
+    step done {
+        action complete
+    }
+}"
+                }
+            }
+
+            div { class: "card", style: "margin-bottom: 24px;",
+                h3 { style: "margin-bottom: 16px; font-size: 1.4rem;", "Expense with Discount Calculation" }
+                pre {
+                    class: "mono",
+                    style: "padding: 16px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; font-size: 12px; overflow-x: auto;",
+                    "workflow DiscountCalculator v1.0 {
+    input {
+        subtotal: number
+        customer_tier: string
+        is_loyalty_member: boolean
+    }
+
+    start calculate
+
+    step calculate {
+        let discount_pct = if customer_tier == \"gold\" {
+            if subtotal > 1000 { 20 } else { 15 }
+        } else if customer_tier == \"silver\" {
+            if subtotal > 500 { 10 } else { 5 }
+        } else {
+            if is_loyalty_member { 5 } else { 0 }
+        }
+
+        let discount_amount = subtotal * (discount_pct / 100)
+        let total = subtotal - discount_amount
+
+        if total > 5000 {
+            goto manager_approval
+        } else {
+            goto auto_approve
+        }
+    }
+
+    step manager_approval {
+        action request_manager_approval
+        goto done
+    }
+
+    step auto_approve {
+        action approve
+        goto done
+    }
+
+    step done {
+        action complete
+    }
+}"
+                }
+            }
+
+            // ============================================================
+            // SECTION: API ENDPOINTS
+            // ============================================================
+            div { class: "section-title", "API ENDPOINTS" }
+            div { class: "card",
+                table { style: "width: 100%; border-collapse: collapse;",
+                    thead {
+                        tr { style: "border-bottom: 2px solid var(--border);",
+                            th { style: "text-align: left; padding: 12px; font-size: 12px; text-transform: uppercase;", "Method" }
+                            th { style: "text-align: left; padding: 12px; font-size: 12px; text-transform: uppercase;", "Endpoint" }
+                            th { style: "text-align: left; padding: 12px; font-size: 12px; text-transform: uppercase;", "Description" }
+                        }
+                    }
+                    tbody {
+                        tr { style: "border-bottom: 1px solid var(--border-subtle);",
+                            td { class: "mono", style: "padding: 10px; color: var(--accent-primary);", "POST" }
+                            td { class: "mono", style: "padding: 10px;", "/api/workflows/compile" }
+                            td { style: "padding: 10px;", "Compile RheLang to WASM" }
+                        }
+                        tr { style: "border-bottom: 1px solid var(--border-subtle);",
+                            td { class: "mono", style: "padding: 10px; color: var(--accent-primary);", "POST" }
+                            td { class: "mono", style: "padding: 10px;", "/api/workflows/run" }
+                            td { style: "padding: 10px;", "Execute a compiled workflow" }
+                        }
+                        tr { style: "border-bottom: 1px solid var(--border-subtle);",
+                            td { class: "mono", style: "padding: 10px; color: var(--accent-primary);", "POST" }
+                            td { class: "mono", style: "padding: 10px;", "/api/workflows/{name}/bulk" }
+                            td { style: "padding: 10px;", "Bulk execution with concurrency" }
+                        }
+                        tr { style: "border-bottom: 1px solid var(--border-subtle);",
+                            td { class: "mono", style: "padding: 10px; color: var(--accent-primary);", "GET" }
+                            td { class: "mono", style: "padding: 10px;", "/api/workflows" }
+                            td { style: "padding: 10px;", "List all deployed workflows" }
+                        }
+                        tr { style: "border-bottom: 1px solid var(--border-subtle);",
+                            td { class: "mono", style: "padding: 10px; color: var(--accent-primary);", "GET" }
+                            td { class: "mono", style: "padding: 10px;", "/api/executions/{id}" }
+                            td { style: "padding: 10px;", "Get execution details & trace" }
+                        }
+                        tr { style: "border-bottom: 1px solid var(--border-subtle);",
+                            td { class: "mono", style: "padding: 10px; color: var(--accent-primary);", "POST" }
+                            td { class: "mono", style: "padding: 10px;", "/api/executions/{id}/resume" }
+                            td { style: "padding: 10px;", "Resume suspended execution" }
+                        }
+                    }
+                }
+            }
+
+            // ============================================================
+            // SECTION: INTEGRATIONS
+            // ============================================================
+            div { class: "section-title", "INTEGRATIONS" }
+            div { style: "display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px;",
+                DocCard {
+                    title: "Email".to_string(),
+                    desc: "Send emails via SMTP or APIs (SendGrid, Mailgun). Actions: send_email".to_string(),
+                    tag: "stable".to_string()
+                }
+                DocCard {
+                    title: "Salesforce".to_string(),
+                    desc: "CRM integration for leads and contacts. Actions: get_lead, create_task, upsert_lead".to_string(),
+                    tag: "stable".to_string()
+                }
+                DocCard {
+                    title: "HubSpot".to_string(),
+                    desc: "Marketing and sales automation. Actions: get_contact, create_deal".to_string(),
+                    tag: "stable".to_string()
+                }
+                DocCard {
+                    title: "Slack".to_string(),
+                    desc: "Team notifications and alerts. Actions: post_message".to_string(),
+                    tag: "stable".to_string()
+                }
+                DocCard {
+                    title: "Datadog".to_string(),
+                    desc: "Monitoring and observability events. Actions: send_event".to_string(),
+                    tag: "stable".to_string()
+                }
+                DocCard {
+                    title: "Stripe".to_string(),
+                    desc: "Payment processing. Actions: capture_payment".to_string(),
+                    tag: "stable".to_string()
+                }
+            }
+        }
+    }
+}
+
+#[component]
+fn DocCard(title: String, desc: String, tag: String) -> Element {
+    rsx! {
+        div { class: "card",
+            div { style: "display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;",
+                h3 { style: "font-size: 1.25rem; margin: 0;", "{title}" }
+                span { class: "status-pill", "{tag}" }
+            }
+            p { style: "font-size: 14px; color: var(--text-secondary); line-height: 1.6;", "{desc}" }
+        }
+    }
+}

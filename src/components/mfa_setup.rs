@@ -6,8 +6,8 @@ pub fn MfaSetup() -> Element {
     let mut setup_response = use_signal(|| Option::<MfaSetupResponse>::None);
     let mut verify_response = use_signal(|| Option::<MfaVerifySetupResponse>::None);
     let mut verification_code = use_signal(String::new);
-    let mut error = use_signal(|| Option::<String>::None);
-    let mut loading = use_signal(|| false);
+    let error = use_signal(|| Option::<String>::None);
+    let loading = use_signal(|| false);
     let mut mfa_enabled = use_signal(|| false);
     let mut show_disable = use_signal(|| false);
     let mut disable_code = use_signal(String::new);
@@ -190,7 +190,7 @@ pub fn MfaSetup() -> Element {
                                             div { style: "font-size: 13px; color: var(--status-warning); margin-bottom: 12px;",
                                                 "⚠️ Save these codes in a secure location. They can be used to recover access if you lose your authenticator device."
                                             }
-                                            div { style: "background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;",
+                                            div { style: "background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px; display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px;",
                                                 for code in codes {
                                                     div { style: "font-family: monospace; font-size: 14px; background: var(--bg-secondary); padding: 8px; border-radius: 4px; text-align: center;", "{code}" }
                                                 }

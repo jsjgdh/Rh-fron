@@ -17,7 +17,7 @@ pub fn Home() -> Element {
                     
                     h1 { 
                         class: "page-title", 
-                        style: "font-size: 8rem; margin-bottom: 24px; max-width: 1000px; margin-left: auto; margin-right: auto;", 
+                        style: "font-size: clamp(3rem, 8vw, 8rem); margin-bottom: 24px; max-width: 1000px; margin-left: auto; margin-right: auto;", 
                         "THE PLATFORM FOR POLICY GOVERNANCE" 
                     }
                     
@@ -125,8 +125,8 @@ pub fn AuthForm() -> Element {
     let mut email = use_signal(String::new);
     let mut password = use_signal(String::new);
     let mut role = use_signal(|| "Policy Architect".to_string());
-    let mut error = use_signal(|| Option::<String>::None);
-    let mut loading = use_signal(|| false);
+    let error = use_signal(|| Option::<String>::None);
+    let loading = use_signal(|| false);
     let mut pending_mfa_user_id = use_signal(|| Option::<String>::None);
     let mut pending_mfa_email = use_signal(|| Option::<String>::None);
     let mut pending_mfa_role = use_signal(|| Option::<String>::None);
@@ -138,7 +138,7 @@ pub fn AuthForm() -> Element {
     let handle_auth = move |_| {
         let e = email.read().clone();
         let p = password.read().clone();
-        let mut n = nav.clone();
+        let n = nav.clone();
         let mut mfa_user_id = pending_mfa_user_id.clone();
         let mut mfa_email = pending_mfa_email.clone();
         let mut mfa_role = pending_mfa_role.clone();
@@ -197,7 +197,7 @@ pub fn AuthForm() -> Element {
         let email = pending_mfa_email.read().clone();
         let role = pending_mfa_role.read().clone();
         let backup = *use_backup_code.read();
-        let mut n = nav.clone();
+        let n = nav.clone();
         let mut err_signal = error.clone();
         let mut loading_signal = loading.clone();
         
@@ -307,8 +307,12 @@ pub fn AuthForm() -> Element {
                             r#type: "email",
                             placeholder: "{placeholders::EMAIL}",
                             value: "{email}",
+                            aria_required: "true",
+                            aria_invalid: "false",
+                            aria_describedby: "email-help",
                             oninput: move |e| email.set(e.value())
                         }
+                        span { id: "email-help", style: "font-size: 11px; color: var(--text-faint);", "Enter your work email address" }
                     }
 
                     div { class: "auth-input-group",
@@ -317,8 +321,12 @@ pub fn AuthForm() -> Element {
                             r#type: "password",
                             placeholder: "{placeholders::PASSWORD}",
                             value: "{password}",
+                            aria_required: "true",
+                            aria_invalid: "false",
+                            aria_describedby: "password-help",
                             oninput: move |e| password.set(e.value())
                         }
+                        span { id: "password-help", style: "font-size: 11px; color: var(--text-faint);", if *is_signup.read() { "Use 8+ chars with uppercase, lowercase, digit, and special character" } else { "Enter your password" } }
                     }
 
                     if *is_signup.read() {

@@ -14,7 +14,7 @@ pub fn ExecutionForm() -> Element {
     let mut execution_result = use_signal(|| Option::<ExecutionResultData>::None);
 
     let workflows_res =
-        use_resource(|| async move { crate::api::list_workflows().await.unwrap_or_default() });
+        use_resource(|| async move { crate::api::list_workflows(None).await.unwrap_or_default() });
 
     let detail_res = use_resource(move || {
         let workflow = selected_workflow.read().clone();

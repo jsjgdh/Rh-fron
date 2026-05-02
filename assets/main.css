@@ -3,7 +3,7 @@
 :root {
     /* Base Colors - Light (Default) */
     /* Base Colors - Light (Default) */
-    --bg: #FAFAF8;
+    --bg: #fbfbf7;
     --surface: #FFFFFF;
     --surface-elevated: #FFFFFF;
     --border: #E6E6DC;
@@ -14,8 +14,8 @@
     --text-secondary: #3F3F46;
     --text-faint: #71717A;
     
-    --accent-primary: #14B8A6; /* Emerald/Teal */
-    --accent-hover: #0D9488;
+    --accent-primary: #2dd4bf; /* Emerald/Teal */
+    --accent-hover: #14b8a6;
     --accent-bg: rgba(20, 184, 166, 0.12);
     
     --status-success: #10B981;
@@ -26,6 +26,29 @@
     --status-warning-bg: rgba(245, 158, 11, 0.1);
     --status-error-bg: rgba(239, 68, 68, 0.1);
     --status-info-bg: rgba(59, 130, 246, 0.1);
+
+    /* Role Colors */
+    --color-admin: #f59e0b;
+    --color-architect: #6366f1;
+    --color-operator: #22c55e;
+
+    /* Interactive Accent */
+    --accent-secondary: #8b5cf6;
+
+    /* Spacing Tokens */
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-5: 24px;
+    --space-6: 32px;
+    --space-8: 48px;
+    --space-10: 64px;
+
+    /* Forensic/Dark Theme Colors */
+    --bg-forensic: #08080A;
+    --bg-ide: #1a1b26;
+    --text-ide: #a9b1d6;
 
     --accent-soft: rgba(20, 184, 166, 0.08);
     --bg-secondary: #F5F5F0;
@@ -58,7 +81,7 @@
     --text-faint: #71717A;
 
     --accent-primary: #2DD4BF;
-    --accent-hover: #5EEAD4;
+    --accent-hover: #14b8a6;
     --accent-bg: rgba(45, 212, 191, 0.1);
     --accent-soft: rgba(45, 212, 191, 0.05);
     --bg-secondary: #27272A;
@@ -235,6 +258,7 @@ h1, h2, h3, .brand-name, .nav-item, .nav-label {
     background: var(--accent-bg);
     color: var(--accent-primary);
     font-weight: 700;
+    border-left: 3px solid var(--accent-primary);
 }
 
 /* Premium Components */
@@ -654,6 +678,66 @@ select:focus-visible {
     height: 200px;
 }
 
+/* Loading State */
+.loading-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 64px 32px;
+}
+
+.loading-spinner {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent-primary);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+.loading-spinner-large {
+    width: 40px;
+    height: 40px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent-primary);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+.loading-inline {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Empty State */
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 64px 32px;
+    text-align: center;
+}
+
+.empty-state-icon {
+    font-size: 4rem;
+    margin-bottom: 24px;
+    opacity: 0.5;
+}
+
+/* Retry Error */
+.retry-error {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 64px 32px;
+    text-align: center;
+}
+
 /* Toast/Notification System */
 .toast-container {
     position: fixed;
@@ -750,6 +834,8 @@ select:focus-visible {
     .grid-4 { grid-template-columns: repeat(2, 1fr); }
     .sidebar { width: 240px; padding: 24px 16px; }
     .content-area { padding: 32px; }
+    .builder-palette { width: 200px; }
+    .builder-properties { width: 240px; }
 }
 
 @media (max-width: 768px) {
@@ -814,10 +900,14 @@ select:focus-visible {
         margin-top: 40px;
     }
 
-    .auth-card {
+.auth-card {
         margin: 40px 16px;
-        padding: 32px 24px;
     }
+
+    .builder-palette { display: none; }
+    .builder-properties { display: none; }
+    .builder-mobile-toolbar { display: flex !important; }
+}
 }
 
 @media (max-width: 480px) {
@@ -1325,46 +1415,11 @@ select:focus-visible {
     z-index: -1;
     pointer-events: none;
     overflow: hidden;
-    background: var(--bg);
-}
-
-.grid-line {
-    position: absolute;
-    background: var(--border-subtle);
-    opacity: 0.5;
-}
-
-.grid-line-v { width: 1px; height: 100%; top: 0; }
-.grid-line-h { height: 1px; width: 100%; left: 0; }
-
-.pulse-line {
-    position: absolute;
-    width: 2px;
-    height: 100px;
-    background: linear-gradient(to bottom, transparent, var(--accent-primary), transparent);
-    opacity: 0.6;
-    animation: pulse-v 12s linear infinite;
-}
-
-@keyframes pulse-v {
-    0% { transform: translateY(-100vh); opacity: 0; }
-    20% { opacity: 0.4; }
-    80% { opacity: 0.4; }
-    100% { transform: translateY(100vh); opacity: 0; }
-}
-
-.pulse-line-h {
-    height: 2px;
-    width: 100px;
-    background: linear-gradient(to right, transparent, var(--accent-primary), transparent);
-    animation: pulse-h 12s linear infinite;
-}
-
-@keyframes pulse-h {
-    0% { transform: translateX(-100vw); opacity: 0; }
-    20% { opacity: 0.5; }
-    80% { opacity: 0.5; }
-    100% { transform: translateX(100vw); opacity: 0; }
+    background: 
+        radial-gradient(600px 420px at 70% -10%, rgba(45, 212, 191, 0.20), transparent 60%),
+        radial-gradient(700px 520px at -10% 10%, rgba(17, 24, 39, 0.06), transparent 62%),
+        repeating-linear-gradient(0deg, rgba(17,24,39,0.03), rgba(17,24,39,0.03) 1px, transparent 1px, transparent 18px),
+        var(--bg);
 }
 
 /* ============================================================================
@@ -1952,4 +2007,76 @@ select:focus-visible {
 .empty-state p {
     margin: 0;
     font-size: 14px;
+}
+
+/* Phase 4: Workflow Builder Styles */
+.builder-node {
+    transition: transform 0.1s ease, box-shadow 0.2s ease;
+}
+.builder-node:hover {
+    box-shadow: var(--shadow-lg);
+    transform: translateY(-1px);
+}
+.palette-item:hover {
+    border-color: var(--accent-primary);
+    background: var(--bg-secondary);
+    transform: translateX(4px);
+}
+.builder-canvas svg {
+    cursor: crosshair;
+}
+
+/* Industrial/Enterprise Table Styling (Refined) */
+.type-table {
+    width: 100%;
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    border: 1px solid var(--border);
+}
+.type-row {
+    display: grid;
+    padding: 16px 24px;
+    align-items: center;
+    border-bottom: 1px solid var(--border-subtle);
+    background: var(--surface);
+    transition: background 0.2s ease;
+}
+.type-row:last-child { border-bottom: none; }
+.type-row:hover:not(.type-row-head) {
+    background: var(--bg-secondary);
+}
+.type-row-head {
+    background: var(--bg-secondary);
+    font-weight: 700;
+    font-size: 11px;
+    color: var(--text-faint);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+}
+
+/* Compliance Coverage Progress */
+.coverage-bar {
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+}
+.coverage-fill {
+    height: 100%;
+    background: var(--accent-primary);
+    transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Industrial Card Variant */
+.industrial-card {
+    background: var(--surface);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-lg);
+    padding: 32px;
+    box-shadow: var(--shadow-sm);
+    position: relative;
+    border-top: 4px solid var(--text-primary);
+}
+.industrial-card:hover {
+    border-top-color: var(--accent-primary);
 }

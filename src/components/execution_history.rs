@@ -9,7 +9,7 @@ pub struct ExecutionHistoryProps {
 #[component]
 pub fn ExecutionHistory(props: ExecutionHistoryProps) -> Element {
     let executions = use_resource(|| async move {
-        api::list_recent_executions().await.unwrap_or_default()
+        api::list_recent_executions(None, None).await.unwrap_or_default()
     });
 
     let history = executions.read();

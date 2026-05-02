@@ -21,10 +21,10 @@ pub fn Integrations() -> Element {
         ("leave approval".to_string(), "LeavePolicy".to_string(), "v1.0".to_string())
     ]);
 
-    let mut webhooks = use_resource(api::list_webhooks);
+    let webhooks = use_resource(api::list_webhooks);
     let mut new_webhook_name = use_signal(|| String::new());
     let mut new_webhook_workflow = use_signal(|| String::new());
-    let mut new_webhook_version = use_signal(|| "v1.0".to_string());
+    let new_webhook_version = use_signal(|| "v1.0".to_string());
 
     rsx! {
         div { class: "fade-in",

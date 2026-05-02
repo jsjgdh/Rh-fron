@@ -112,7 +112,7 @@ pub fn ExecutionDetail(id: String) -> Element {
                                 div { class: "card-description", "Highlighted spine showing the exact route taken during execution." }
                             }
                         }
-                        div { class: "vg-canvas",
+                        div { class: "vg-canvas-svg",
                             if let Some(Ok(wf_data)) = &*wf_state {
                                 {
                                     let ast = wf_data.get("ast_json")
@@ -128,6 +128,32 @@ pub fn ExecutionDetail(id: String) -> Element {
                                 }
                             } else {
                                 div { class: "empty-state", "Loading graph verification..." }
+                            }
+                        }
+                    }
+
+                    // ── Logic Forensic Panel ────────────────────────────────
+                    section { class: "card",
+                        style: "grid-column: span 2; background-color: #08080A;",
+                        div { class: "card-header",
+                            div {
+                                div { class: "card-title", "Policy Logic Forensic" }
+                                div { class: "card-description", "Character-level span matching from execution trace to RheLang source." }
+                            }
+                        }
+                        div { class: "ide-panel", style: "min-height: 300px; display: flex; flex-direction: column; padding: 12px;",
+                            if let Some(Ok(wf_data)) = &*wf_state {
+                                {
+                                    let source = wf_data["source"].as_str().unwrap_or("");
+                                    rsx! {
+                                        pre { class: "ide-textarea",
+                                            style: "margin: 0; padding: 16px; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #a9b1d6; overflow: auto; background: #1a1b26; border-radius: 8px; line-height: 1.5;",
+                                            "{source}"
+                                        }
+                                    }
+                                }
+                            } else {
+                                div { class: "empty-state", "Retrieving policy logic..." }
                             }
                         }
                     }

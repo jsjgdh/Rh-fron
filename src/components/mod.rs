@@ -1,5 +1,6 @@
 //! Frontend component modules.
 
+pub mod ui;
 pub mod simulation_view;
 pub mod documentation;
 pub mod execution_form;
@@ -22,3 +23,15 @@ pub mod view_diff;
 pub mod workflow_history;
 pub mod animated_bg;
 pub mod mfa_setup;
+pub mod analytics;
+pub mod templates;
+// Phase 3: UX & Enterprise
+pub mod users;
+pub mod error_panel;
+pub mod test_suite;
+pub mod schedule;
+pub mod approvals;
+// Phase 4: Differentiation
+pub mod builder;
+pub mod compliance;
+pub mod promotion;

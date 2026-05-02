@@ -1,5 +1,6 @@
 use dioxus::prelude::*;
 use crate::components::workflow_graph::WorkflowGraph;
+use crate::components::error_panel::{ErrorPanel, CompileError};
 use crate::app::Route;
 
 #[component]
@@ -7,7 +8,7 @@ pub fn ViewEdit(name: String, version: String) -> Element {
     let mut source_code = use_signal(|| String::new());
     let mut ast_payload = use_signal(|| Option::<serde_json::Value>::None);
     let mut compiling = use_signal(|| false);
-    let mut compile_error = use_signal(|| String::new());
+    let mut compile_errors: Signal<Vec<CompileError>> = use_signal(|| vec![]);
     let mut selected_step = use_signal(|| Option::<String>::None);
     let nav = use_navigator();
 
@@ -112,16 +113,16 @@ pub fn ViewEdit(name: String, version: String) -> Element {
                                 textarea {
                                     class: "ide-textarea",
                                     value: "{source_code}",
-                                    oninput: move |e| source_code.set(e.value()),
+                                    oninput: move |e| {
+                                        compile_errors.set(vec![]);
+                                        source_code.set(e.value());
+                                    },
                                     spellcheck: false,
                                 }
                             }
 
-                            if !compile_error.read().is_empty() {
-                                div { class: "badge badge-danger", style: "margin: 12px; border-radius: 4px;", 
-                                    "{compile_error}" 
-                                }
-                            }
+                            // Structured error panel
+                            ErrorPanel { errors: compile_errors.read().clone() }
 
                             div { style: "padding: 16px; background: rgba(0,0,0,0.2);",
                                 button {
@@ -130,16 +131,19 @@ pub fn ViewEdit(name: String, version: String) -> Element {
                                     disabled: *compiling.read(),
                                     onclick: move |_| {
                                         let source = source_code.read().clone();
-                                        let mut n = nav.clone();
+                                        let n = nav.clone();
                                         compiling.set(true);
-                                        compile_error.set(String::new());
+                                        compile_errors.set(vec![]);
                                         spawn(async move {
                                             match crate::api::compile_workflow(&source).await {
                                                 Ok(res) if res.success => {
                                                     n.push(Route::ViewGenWorkflow { name: res.workflow_name, version: res.version });
                                                 }
-                                                Ok(res) => compile_error.set(res.error.unwrap_or_else(|| "Logic audit failed.".into())),
-                                                Err(e) => compile_error.set(e),
+                                                Ok(res) => {
+                                                    let raw = res.error.unwrap_or_else(|| "Logic audit failed.".into());
+                                                    compile_errors.set(CompileError::from_str(&raw));
+                                                }
+                                                Err(e) => compile_errors.set(CompileError::from_str(&e)),
                                             }
                                             compiling.set(false);
                                         });
